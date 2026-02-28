@@ -1,10 +1,10 @@
-# Project 1: CHARLI Home 🏠🤖
+# Project 1: CHARLI's Home 🏠🤖
 *A JARVIS-style voice assistant — powered by the real CHARLI*
 
 **Status:** In Progress
 **Started:** 2026-02-21
 **Team:** Christian Bermeo + Isabella Bermeo 🎨
-**Hardware:** Raspberry Pi 5 8GB · Pirate Audio Dual Mic HAT · Bluetooth Speaker · 256GB NVMe SSD
+**Hardware:** Raspberry Pi 5 8GB · Official M.2 HAT+ · 256GB NVMe SSD · Active Cooler · Pirate Audio Dual Mic HAT · Bluetooth Speaker
 
 ---
 
@@ -15,16 +15,23 @@ A home voice assistant. You press a button → say something → Charli listens,
 This isn't a generic AI — it's the actual CHARLI who knows Sir, Madam, and the whole family. The Pi is just the ears, mouth, and display. The brain lives on the Mac Mini.
 
 ```
-[Press Button A]
-       ↓
-[Pirate Audio mics record your voice]
-       ↓
-[Whisper turns speech into text — runs ON the Pi]
-       ↓
-[Text sent to Mac Mini → OpenClaw → Real CHARLI responds]
-       ↓
-[Response spoken aloud + shown on display]
+[Say "Charli" or "Hey Charli"]
+             ↓
+ [Porcupine detects wake word]
+             ↓
+  [Pirate Audio mics record]
+             ↓
+[Whisper: speech → text + language]
+             ↓
+ [OpenClaw → Real CHARLI responds]
+             ↓
+  [Piper TTS speaks the response]
+             ↓
+  [Display shows orb + subtitles]
 ```
+
+> **Phase 2 uses a button instead of wake word** -- press Button A to trigger.
+> **Phase 5 upgrades to wake word** -- just say the name. Both approaches use the same pipeline underneath.
 
 ---
 
@@ -57,25 +64,48 @@ The Pirate Audio HAT has a small 240×240 color screen. It shows two things at o
 | Item | Note |
 |------|------|
 | Raspberry Pi 5 8GB | The main computer |
-| 256GB NVMe SSD Kit | Our boot drive — faster than microSD |
-| Pirate Audio Dual Mic HAT | Microphones + color display |
+| Official Raspberry Pi M.2 HAT+ | Sits on top of the Pi — holds the NVMe SSD. Includes GPIO header extender. |
+| 256GB NVMe SSD | Our boot drive — plugs into the M.2 HAT+. Much faster than microSD. |
+| Official Raspberry Pi Active Cooler | Fan + heatsink — clips onto the CPU. Keeps the Pi cool under load. |
+| Pirate Audio Dual Mic HAT | Microphones + color display — stacks on top via the GPIO extender |
 | Bluetooth Speaker | Charli's voice |
 | 32GB microSD | Used ONLY for the very first boot (see Phase 0) |
 | Keyboard + Mouse + Monitor | Only needed for first boot setup |
+
+### Hardware Stack (bottom to top)
+
+```
+┌─────────────────────────────┐
+│  Pirate Audio Dual Mic HAT  │  ← plugs into the extended GPIO pins
+├─────────────────────────────┤
+│  GPIO Header Extender       │  ← included with M.2 HAT+
+├─────────────────────────────┤
+│  M.2 HAT+ with NVMe SSD    │  ← standoffs + FFC ribbon cable to PCIe
+├─────────────────────────────┤
+│  Active Cooler (on CPU)     │  ← clips directly onto the SoC chip
+├─────────────────────────────┤
+│  Raspberry Pi 5             │  ← the board itself
+└─────────────────────────────┘
+```
+
+> The Active Cooler fits between the Pi 5 and the M.2 HAT+ — Raspberry Pi designed the standoff height to accommodate it. The GPIO header extender (included with the M.2 HAT+) passes the GPIO pins through so the Pirate Audio HAT can plug in on top.
 
 ---
 
 ## 🗓️ What We Build Each Sunday
 
-| Phase | Goal | When |
-|-------|------|------|
-| 0 | Turn on the Pi for the first time + set up Tailscale | Sunday 1 |
-| 1 | Get the microphone HAT and Bluetooth speaker working | Sunday 1 |
-| 2 | **Isabella writes the code** — button makes Charli talk back 🎉 | Sunday 1 (the big goal) |
-| 3 | Add the Wobble Orb display + subtitles | Sunday 2 |
-| 4 | Upgrade to a more natural voice (Piper TTS) | Sunday 2 |
-| 5 | Wake word — just say "Charli" to wake her up | Sunday 3 |
-| 6 | Smart home buttons trigger automations | Sunday 4+ |
+| Phase | Goal | Saturday Plan |
+|-------|------|---------------|
+| 0 | First boot + OS setup + Tailscale | Morning — hardware setup |
+| 1 | Mic HAT + Bluetooth speaker working | Morning |
+| 2 | **Voice pipeline** — say something, hear Charli respond 🎉 | Late morning (THE GOAL) |
+| 3 | Wobble Orb display + subtitles | Afternoon (if time allows) |
+| 4 | Natural voice — Piper TTS (Alan + Spanish) | Afternoon (if time allows) |
+| 5 | Wake word — "Charli" or "Hey Charli" | Afternoon (if time allows) |
+| 6 | Smart home automations | Future Sunday |
+
+> **Saturday minimum goal: Phase 2.** If Phase 2 is working — you speak, Charli answers — that's a win.
+> Phases 3–5 are the polish. Don't stress them if time is short. Record the video after Phase 2.
 
 ---
 ---
@@ -104,15 +134,25 @@ The Pirate Audio HAT has a small 240×240 color screen. It shows two things at o
    - **Storage:** the 32GB microSD card
 6. Click **Write** and wait about 5 minutes
 
-## Step 0.2 — First Boot from microSD
+## Step 0.2 — Assemble the Active Cooler
+
+> Do this BEFORE the first boot. The Active Cooler keeps the CPU from overheating — especially important when running Whisper later.
+
+1. With the Pi 5 **unplugged and powered off**, look at the top of the board
+2. Find the **fan header** — a small white connector near the edge of the board (labeled "FAN")
+3. Clip the Active Cooler's heatsink onto the silver CPU chip (the SoC) in the center of the board — it clips on with spring-loaded push pins
+4. Plug the fan's cable into the fan header
+5. That's it — the fan will spin automatically when the Pi gets warm
+
+## Step 0.3 — First Boot from microSD
 
 1. Insert the microSD into the Pi 5 (slot is on the underside)
 2. Connect the monitor, keyboard, and mouse to the Pi
-3. Plug in power — the Pi will boot!
+3. Plug in power — the Pi will boot! The Active Cooler fan may spin up briefly.
 4. **👩‍💻 Isabella: watch it boot for the first time** 🎉
 5. Go through the setup wizard (you can skip installing updates for now)
 
-## Step 0.3 — Update the Pi's Bootloader
+## Step 0.4 — Update the Pi's Bootloader
 
 > This tells the Pi how to boot from the NVMe SSD. Run this before we move over.
 
@@ -123,14 +163,21 @@ sudo rpi-eeprom-update -a
 sudo reboot
 ```
 
-## Step 0.4 — Move the OS to the NVMe SSD
+## Step 0.5 — Install the M.2 HAT+ and Move the OS to the NVMe SSD
 
-> The Pi 5 has a special slot (PCIe) that the NVMe SSD plugs into. It's much faster than microSD.
+> The M.2 HAT+ sits on top of the Pi (above the Active Cooler) and holds the NVMe SSD. It connects to the Pi's PCIe slot via a flat ribbon cable (FFC).
 
-1. Make sure the Pi is powered off: `sudo shutdown now`
-2. Seat the NVMe SSD into the PCIe adapter from the kit, then plug it into the Pi 5's M.2 slot
-3. Power the Pi back on (it will still boot from microSD for now)
-4. Open a Terminal and run the Pi's built-in SD Card Copier:
+### Install the hardware:
+
+1. Shut down the Pi: `sudo shutdown now` and unplug power
+2. **Insert the NVMe SSD** into the M.2 slot on the M.2 HAT+ board and secure it with the screw
+3. **Connect the FFC ribbon cable** from the M.2 HAT+ to the Pi 5's PCIe connector (the small flat connector near the edge of the board — lift the latch, slide the ribbon in, press the latch down)
+4. **Mount the M.2 HAT+** above the Pi using the included standoffs — the Active Cooler fits in the gap between them
+5. **Attach the GPIO header extender** to the top of the M.2 HAT+ (this passes the GPIO pins through so the Pirate Audio HAT can connect later)
+6. Plug the microSD back in (we still need it for this step)
+7. Power the Pi back on — it will boot from microSD
+
+### Copy the OS to the NVMe SSD:
 
 ```bash
 # This copies everything from the microSD to the NVMe SSD
@@ -151,28 +198,64 @@ sudo dd if=/dev/mmcblk0 of=/dev/nvme0n1 bs=4M status=progress
 sudo sync
 ```
 
-5. Shut down: `sudo shutdown now`
-6. Remove the microSD card
-7. Power on — Pi now boots from the 256GB NVMe SSD ✅
+8. Shut down: `sudo shutdown now`
+9. Remove the microSD card
+10. Power on — Pi now boots from the 256GB NVMe SSD ✅
 
-## Step 0.5 — SSH In From the Mac
+## Step 0.6 — SSH In From the Mac
 
 > After this step, we won't need the monitor/keyboard/mouse anymore. We work from the Mac.
 
+### How to open Terminal on the Mac:
+1. Press **Cmd + Space** to open Spotlight
+2. Type **Terminal** and press Enter
+3. A black/white window will appear — this is the Terminal
+
+### Connect to the Pi:
 ```bash
-# On your Mac, open Terminal and type:
+# On your Mac, in Terminal, type this and press Enter:
 ssh charli@charli-home.local
-# Enter the password you set in Step 0.1
 ```
 
-If that doesn't work, find the Pi's IP address on your router and try:
-```bash
-ssh charli@192.168.X.X
+The first time you connect, you'll see a message like:
 ```
+The authenticity of host 'charli-home.local' can't be established.
+ED25519 key fingerprint is SHA256:xxxxxxxxxxx
+Are you sure you want to continue connecting (yes/no/[fingerprint])?
+```
+Type **yes** and press Enter. This only happens the first time.
+
+Then it will ask for the password you set in Step 0.1. Type it and press Enter.
+(The password won't show as you type — that's normal! Just type it and press Enter.)
+
+You'll know you're connected when the prompt changes to something like:
+```
+charli@charli-home:~ $
+```
+
+### If `charli-home.local` doesn't work:
+Sometimes `.local` names take a minute to show up on the network. Try these in order:
+
+1. **Wait 30 seconds and try again** — the Pi may still be starting up
+2. **Find the Pi's IP address** — on the Pi (with the monitor still connected), run:
+   ```bash
+   hostname -I
+   ```
+   It will print something like `192.168.1.42`. Then on the Mac:
+   ```bash
+   ssh charli@192.168.1.42
+   ```
+3. **Check they're on the same WiFi** — the Mac and Pi must be on the same network
+
+### To disconnect from the Pi:
+```bash
+exit
+```
+This brings you back to your Mac's Terminal. You can reconnect anytime with `ssh charli@charli-home.local`.
 
 **👩‍💻 Isabella: you type the SSH command. You're logging into the Pi remotely!**
 
-## Step 0.6 — Install Essential Tools
+## Step 0.7 — Install Essential Tools
 
 ```bash
 # Update the system packages list
@@ -229,16 +312,17 @@ tailscale ip -4
 
 ## Step 1.1 — Physical Installation
 
-> The HAT plugs onto the 40 metal pins (the GPIO header) on the Pi 5.
+> The Pirate Audio HAT plugs onto the GPIO header extender that's already sticking up from the M.2 HAT+. It sits at the very top of the stack.
 
 1. **Shut down the Pi first!** Never add hardware while powered on.
    ```bash
    sudo shutdown now
    ```
 2. Unplug the power cable
-3. Align the Pirate Audio Dual Mic HAT over the GPIO pins — the HAT has a matching socket underneath
-4. Press down firmly and evenly until it's fully seated
-5. Power the Pi back on
+3. Align the Pirate Audio Dual Mic HAT over the GPIO header extender on top of the M.2 HAT+
+4. Press down firmly and evenly until it's fully seated — the pins should be snug
+5. Your full stack is now: **Pi 5 → Active Cooler → M.2 HAT+ (with NVMe) → GPIO Extender → Pirate Audio HAT**
+6. Power the Pi back on
 
 ## Step 1.2 — Enable SPI (Needed for the Display)
 
@@ -275,20 +359,34 @@ ssh charli@charli-home.local
 
 ## Step 1.4 — Test the Microphones
 
+> We haven't connected the Bluetooth speaker yet, so we can't listen to the recording on the Pi. Instead we'll check that the mic is detected, record a clip, and verify the file isn't empty.
+
 ```bash
 # Show available audio recording devices — should list the Pirate Audio HAT
 arecord -l
-
-# Record 5 seconds of audio
-arecord -D hw:0,0 -f S16_LE -r 16000 -c 1 -d 5 /tmp/mic_test.wav
-
-# Play it back to confirm the mic captured something
-aplay /tmp/mic_test.wav
 ```
 
-**👩‍💻 Isabella: talk into the mic while it records. Then listen to hear yourself played back!**
+You should see something like `card 0: ... Pirate Audio` in the list. If you don't see it, the HAT may not be seated properly — power off and re-seat it.
 
-If you don't hear anything, try `hw:1,0` instead of `hw:0,0`.
+```bash
+# Record 5 seconds of audio — talk into the mic while this runs!
+arecord -D hw:0,0 -f S16_LE -r 16000 -c 1 -d 5 /tmp/mic_test.wav
+
+# Check that the file was created and has actual audio data (should be ~160KB, NOT 0 bytes)
+ls -lh /tmp/mic_test.wav
+```
+
+If the file size is around **156K–160K**, the mic is recording. ✅
+If the file is **0 bytes** or the command fails, try `hw:1,0` instead of `hw:0,0`.
+
+**Want to hear the recording?** Copy it to your Mac and play it there:
+```bash
+# Run this ON YOUR MAC (not the Pi) — it copies the file from the Pi to your Desktop
+scp charli@charli-home.local:/tmp/mic_test.wav ~/Desktop/mic_test.wav
+```
+Then double-click `mic_test.wav` on your Mac Desktop to listen. If you hear your voice, the mic works!
+
+**👩‍💻 Isabella: say something fun into the mic while it records, then check if the file has your voice!**
 
 ## Step 1.5 — Connect the Bluetooth Speaker
 
@@ -367,7 +465,7 @@ pip install openai-whisper
 # (Despite the name, we're NOT calling OpenAI — we're calling our own CHARLI)
 pip install openai
 
-# GPIO — lets Python control the Pi's buttons
+# GPIO -- lets Python control the Pi's buttons (Phase 2 only)
 pip install RPi.GPIO
 
 # Display libraries — for the Wobble Orb animation
@@ -427,6 +525,8 @@ If CHARLI responds — you're connected! ✅
 
 ## File 1: `src/record.py` — Record Audio When Button is Pressed
 
+> This is the first building block. It does ONE thing: record audio from the microphone and save it to a file. Later, `charli_home.py` will import this function and use it as a step in the pipeline.
+
 ```bash
 nano ~/charli-home/src/record.py
 ```
@@ -434,13 +534,12 @@ nano ~/charli-home/src/record.py
 ```python
 #!/usr/bin/env python3
 """
-CHARLI Home - Step 1: Listen for a button press and record audio.
+CHARLI Home - Building Block 1: Record audio from the microphone.
 Written by: Isabella Bermeo 🎨
-"""
 
-# We need to import (load) tools that other people already wrote.
-# RPi.GPIO lets us detect button presses on the Pi.
-import RPi.GPIO as GPIO
+This file does ONE thing: record audio and save it.
+The main program (charli_home.py) imports this and uses it as one step.
+"""
 
 # sounddevice records audio from the microphone.
 import sounddevice as sd
@@ -448,14 +547,8 @@ import sounddevice as sd
 # soundfile saves the recorded audio to a file.
 import soundfile as sf
 
-# time lets us pause the program for a moment (to avoid double-presses).
-import time
-
 
 # ── Settings ──────────────────────────────────────────────────────────
-# Which GPIO pin is Button A connected to on the Pirate Audio HAT?
-BUTTON_A = 5
-
 # How many audio samples per second? 16000 is great quality for voice.
 SAMPLE_RATE = 16000
 
@@ -464,15 +557,6 @@ DURATION = 5
 
 # Where to save the audio file.
 OUTPUT_FILE = "/tmp/charli_recording.wav"
-
-
-# ── Set up the button ──────────────────────────────────────────────────
-# Tell the Pi to use "BCM" pin numbering (the numbers printed on diagrams).
-GPIO.setmode(GPIO.BCM)
-
-# Set up Button A as an input pin.
-# PUD_UP means it reads HIGH normally and goes LOW when pressed.
-GPIO.setup(BUTTON_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
 # ── The recording function ────────────────────────────────────────────
@@ -499,43 +583,33 @@ def record_audio():
     return OUTPUT_FILE
 
 
-# ── Main loop ─────────────────────────────────────────────────────────
-print("CHARLI Home — Recording Test")
-print("Press Button A to record 5 seconds...")
-print("Press Ctrl+C to quit")
-
-try:
-    while True:
-        # GPIO.LOW means the button is being pressed
-        if GPIO.input(BUTTON_A) == GPIO.LOW:
-            record_audio()
-
-            # Wait half a second so one press doesn't trigger twice
-            time.sleep(0.5)
-
-        # Small pause so we're not checking the button millions of times per second
-        time.sleep(0.05)
-
-except KeyboardInterrupt:
-    # When you press Ctrl+C, clean up the GPIO pins before quitting
-    print("\nGoodbye!")
-    GPIO.cleanup()
+# ── Test it ───────────────────────────────────────────────────────────
+# This only runs if you run this file by itself (not when imported).
+# That way you can test this building block alone before using it in the main app.
+if __name__ == "__main__":
+    print("Recording test — speak into the mic for 5 seconds...")
+    record_audio()
 ```
 
-**Run it:**
+**Test it:**
 ```bash
 cd ~/charli-home
 source .venv/bin/activate
-sudo python3 src/record.py
+python3 src/record.py
 ```
 
-> **Why `sudo`?** GPIO access requires administrator permission on the Pi.
+Speak into the mic and confirm you see "✅ Saved". ✅
 
-Press Button A, say something, and confirm you see "✅ Saved". ✅
+> **How does `if __name__ == "__main__"` work?**
+> When you run `python3 src/record.py` directly, Python sets `__name__` to `"__main__"`, so the test code runs.
+> But when another file does `from src.record import record_audio`, the test code is skipped — only the function is loaded.
+> This is how Python building blocks work: each file can be tested alone OR imported by other files.
 
 ---
 
 ## File 2: `src/transcribe.py` — Convert Audio to Text
+
+> Building block 2: takes an audio file and returns what was said as text.
 
 ```bash
 nano ~/charli-home/src/transcribe.py
@@ -544,7 +618,7 @@ nano ~/charli-home/src/transcribe.py
 ```python
 #!/usr/bin/env python3
 """
-CHARLI Home - Step 2: Convert the recorded audio into text using Whisper.
+CHARLI Home - Building Block 2: Convert audio into text using Whisper.
 Whisper is an AI that runs locally on the Pi — no internet needed!
 """
 
@@ -563,34 +637,42 @@ print("✅ Whisper is ready!")
 
 
 # ── The transcribe function ───────────────────────────────────────────
-def transcribe(audio_path: str) -> str:
+def transcribe(audio_path: str) -> tuple:
     """
-    Takes the path to an audio file and returns the text of what was said.
-    Example: transcribe("/tmp/charli_recording.wav") → "What is the weather?"
+    Takes the path to an audio file and returns (text, language).
+    Whisper auto-detects the spoken language -- no need to specify it.
+    Examples:
+      ("What is the weather?", "en")
+      ("\u00bfQu\u00e9 hora es?", "es")
     """
 
-    print(f"📝 Listening to {audio_path}...")
+    print(f"\U0001f4dd Listening to {audio_path}...")
 
-    # Ask Whisper to transcribe the audio file
-    # language="en" tells it we're speaking English (faster + more accurate)
-    result = model.transcribe(audio_path, language="en")
+    # Detect language first (Whisper's built-in feature)
+    audio = whisper.load_audio(audio_path)
+    audio = whisper.pad_or_trim(audio)
+    mel = whisper.log_mel_spectrogram(audio).to(model.device)
+    _, probs = model.detect_language(mel)
+    language = max(probs, key=probs.get)  # "en", "es", etc.
 
-    # Pull out just the text from the result
+    # Transcribe using the detected language (more accurate than guessing)
+    result = model.transcribe(audio_path, language=language)
     text = result["text"].strip()
 
-    print(f"💬 You said: '{text}'")
-    return text
+    lang_name = "English" if language == "en" else "Spanish" if language == "es" else language
+    print(f"\U0001f4ac [{lang_name}] You said: '{text}'")
+    return text, language
 
 
 # ── Test it ───────────────────────────────────────────────────────────
-# This only runs if you run this file directly (not when imported by another file)
 if __name__ == "__main__":
-    transcribe("/tmp/charli_recording.wav")
+    text, lang = transcribe("/tmp/charli_recording.wav")
+    print(f"Language detected: {lang}")
 ```
 
 **Test it** (after recording something with record.py):
 ```bash
-sudo python3 src/transcribe.py
+python3 src/transcribe.py
 ```
 
 You should see your words printed as text. ✅
@@ -599,6 +681,8 @@ You should see your words printed as text. ✅
 
 ## File 3: `src/ask_charli.py` — Ask the Real CHARLI
 
+> Building block 3: sends a question to CHARLI and returns her answer.
+
 ```bash
 nano ~/charli-home/src/ask_charli.py
 ```
@@ -606,7 +690,7 @@ nano ~/charli-home/src/ask_charli.py
 ```python
 #!/usr/bin/env python3
 """
-CHARLI Home - Step 3: Send a question to CHARLI and get her response.
+CHARLI Home - Building Block 3: Send a question to CHARLI and get her response.
 
 IMPORTANT: We are NOT calling OpenAI or any random AI service.
 We are calling the OpenClaw gateway running on Dad's Mac Mini.
@@ -644,24 +728,29 @@ Rules for Pi responses:
 - No bullet points, no numbered lists, no markdown symbols like * or #.
 - Speak naturally, like you're talking to someone in the room.
 - You still know Sir (Christian), Madam (Dominica), Isabella, and the family.
-- All family protocols and boundaries apply as always."""
+- All family protocols and boundaries apply as always.
+- IMPORTANT: Respond in {lang_name}. Match the language the user spoke."""
 
 
 # ── The ask function ──────────────────────────────────────────────────
-def ask_charli(question: str) -> str:
+def ask_charli(question: str, language: str = "en") -> str:
     """
-    Sends a question to CHARLI and returns her response as text.
-    Example: ask_charli("What's the weather?") → "It's 45 degrees and cloudy in New York."
+    Sends a question to CHARLI and returns her response.
+    Pass the detected language so CHARLI responds in the same language.
     """
 
-    print(f"🤔 Asking CHARLI: '{question}'")
+    lang_name = "English" if language == "en" else "Spanish" if language == "es" else "English"
+    print(f"\U0001f914 [{lang_name}] Asking CHARLI: '{question}'")
+
+    # Fill in the language in the system prompt
+    prompt = PI_SYSTEM_PROMPT.replace("{lang_name}", lang_name)
 
     # Send the question to the OpenClaw gateway
     response = client.chat.completions.create(
-        model="openclaw:main",          # routes to the real CHARLI session
+        model="openclaw:main",
         messages=[
-            {"role": "system", "content": PI_SYSTEM_PROMPT},  # her instructions
-            {"role": "user",   "content": question}           # our question
+            {"role": "system", "content": prompt},
+            {"role": "user",   "content": question}
         ],
         max_tokens=150,                 # limit response length (keeps it short for voice)
         user="pi-home"                  # stable session ID so CHARLI remembers Pi context
@@ -682,7 +771,7 @@ if __name__ == "__main__":
 
 **Test it:**
 ```bash
-sudo python3 src/ask_charli.py
+python3 src/ask_charli.py
 ```
 
 You should see CHARLI's response printed. ✅
@@ -691,6 +780,8 @@ You should see CHARLI's response printed. ✅
 
 ## File 4: `src/speak.py` — Speak CHARLI's Response Out Loud
 
+> Building block 4: takes text and speaks it through the speaker.
+
 ```bash
 nano ~/charli-home/src/speak.py
 ```
@@ -698,18 +789,20 @@ nano ~/charli-home/src/speak.py
 ```python
 #!/usr/bin/env python3
 """
-CHARLI Home - Step 4: Convert CHARLI's text response into speech and play it.
+CHARLI Home - Building Block 4: Convert text into speech and play it.
 We use espeak-ng for now — it sounds a little robotic but it works.
-In Phase 4 we'll upgrade to Piper which sounds much more natural.
+In Phase 4 we'll swap this building block for a better one (Piper TTS).
 """
 
 # subprocess lets Python run other programs (like espeak-ng)
 import subprocess
 
 
-def speak(text: str):
+def speak(text: str, language: str = "en"):
     """
     Takes a text string and speaks it out loud through the speaker.
+    The language parameter is accepted for API compatibility with Phase 4
+    but espeak uses a single voice for now -- upgraded in Phase 4.
     Example: speak("Hello Sir, it is 72 degrees outside.")
     """
 
@@ -733,16 +826,18 @@ if __name__ == "__main__":
 
 **Test it:**
 ```bash
-sudo python3 src/speak.py
+python3 src/speak.py
 ```
 
 You should hear the voice through the Bluetooth speaker. ✅
 
 ---
 
-## The Main App: `charli_home.py` — Putting It All Together
+## The Main App: `charli_home.py` — Putting the Building Blocks Together
 
-> This is the file that ties everything together. When it runs, CHARLI Home is live.
+> This is where the magic happens. Instead of rewriting all the code, we IMPORT the building blocks Isabella already wrote. The main app just connects them like LEGO pieces.
+>
+> **👩‍💻 Isabella: notice how short this file is. That's because you already did the hard work — each building block handles one job. This file just says what order to do things in.**
 
 ```bash
 nano ~/charli-home/charli_home.py
@@ -755,114 +850,38 @@ CHARLI Home — Version 0.1
 The full voice pipeline:
   Button A → Record → Whisper (speech to text) → CHARLI (AI response) → Speak
 
+This file doesn't do the work itself — it imports the building blocks
+from the src/ folder and connects them together like a pipeline.
+
 Team: Christian & Isabella Bermeo
 Date: 2026-02-21
 """
 
-# Standard Python tools
-import os
 import time
-import subprocess
 
-# Hardware control
+# Hardware control for the button
 import RPi.GPIO as GPIO
 
-# Audio recording
-import sounddevice as sd
-import soundfile as sf
-
-# Speech-to-text AI
-import whisper
-
-# CHARLI's API client
-from openai import OpenAI
+# ── Import our building blocks ────────────────────────────────────────
+# Each of these is a file Isabella wrote in the src/ folder.
+# We import just the function we need from each one.
+from src.record import record_audio          # Step 1: record voice
+from src.transcribe import transcribe        # Step 2: voice → text
+from src.ask_charli import ask_charli        # Step 3: text → CHARLI's answer
+from src.speak import speak                  # Step 4: answer → spoken aloud
 
 
 # ── Settings ──────────────────────────────────────────────────────────
-BUTTON_A    = 5                           # GPIO pin for Button A on Pirate Audio HAT
-SAMPLE_RATE = 16000                       # 16kHz — good quality for voice recording
-DURATION    = 5                           # record for 5 seconds after button press
-TEMP_AUDIO  = "/tmp/charli_recording.wav" # temporary file for the recording
+BUTTON_A = 5   # GPIO pin for Button A on Pirate Audio HAT
 
 
-# ── Connect to CHARLI on the Mac Mini ─────────────────────────────────
-# These were set in .bashrc — if they're missing, the program will crash here
-# with a clear error telling you to set them.
-charli_host  = os.environ["CHARLI_HOST"]
-charli_token = os.environ["CHARLI_TOKEN"]
-
-client = OpenAI(
-    base_url=f"{charli_host}/v1",
-    api_key=charli_token
-)
-
-PI_PROMPT = """You respond through the CHARLI Home Raspberry Pi voice assistant.
-Answer in 1 to 3 sentences only. No lists, no markdown, no asterisks.
-Speak naturally — your answer will be read aloud through a speaker.
-You know Sir (Christian), Madam (Dominica), Isabella, and the whole family.
-Always apply family protocol and keep responses appropriate for all ages."""
-
-
-# ── Set up the button ──────────────────────────────────────────────────
+# ── Set up the button ─────────────────────────────────────────────────
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUTTON_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
-# ── Load Whisper model ────────────────────────────────────────────────
-print("Loading Whisper AI model... (this takes about 30 seconds the first time)")
-stt_model = whisper.load_model("base")
-print("✅ CHARLI Home is ready! Press Button A to speak.")
-
-
-# ── Pipeline functions ────────────────────────────────────────────────
-
-def record():
-    """Records 5 seconds of audio from the microphone."""
-    print("🎤 Recording...")
-    audio = sd.rec(
-        int(DURATION * SAMPLE_RATE),
-        samplerate=SAMPLE_RATE,
-        channels=1,
-        dtype='int16'
-    )
-    sd.wait()  # wait until recording finishes
-    sf.write(TEMP_AUDIO, audio, SAMPLE_RATE)
-    print("✅ Done recording")
-
-
-def transcribe():
-    """Converts the recorded audio file into text using Whisper."""
-    result = stt_model.transcribe(TEMP_AUDIO, language="en")
-    text = result["text"].strip()
-    print(f"💬 You said: '{text}'")
-    return text
-
-
-def ask(question: str) -> str:
-    """Sends the transcribed question to CHARLI and returns her answer."""
-    print("🤔 Asking CHARLI...")
-    response = client.chat.completions.create(
-        model="openclaw:main",
-        messages=[
-            {"role": "system", "content": PI_PROMPT},
-            {"role": "user",   "content": question}
-        ],
-        max_tokens=150,
-        user="pi-home"
-    )
-    answer = response.choices[0].message.content
-    print(f"🤖 CHARLI: '{answer}'")
-    return answer
-
-
-def speak(text: str):
-    """Speaks CHARLI's response out loud through the speaker."""
-    text = text.replace("*", "").replace("#", "").replace("`", "")
-    subprocess.run(["espeak-ng", "-v", "en-us+f3", "-s", "155", "-p", "45", text])
-
-
 # ── Main loop ─────────────────────────────────────────────────────────
-# This loop runs forever until you press Ctrl+C
+print("✅ CHARLI Home is ready! Press Button A to speak.")
 print("Waiting for button press... (Ctrl+C to quit)")
 
 try:
@@ -870,28 +889,34 @@ try:
         # Check if Button A is being pressed (LOW = pressed)
         if GPIO.input(BUTTON_A) == GPIO.LOW:
 
-            # Run the full pipeline
-            record()
+            # Run the full pipeline — each step uses a building block
+            audio_file = record_audio()        # 🎤 Record your voice
 
-            question = transcribe()
+            question, language = transcribe(audio_file)  # voice -> text + language
 
             # Only ask CHARLI if we actually heard something
             if question:
-                answer = ask(question)
-                speak(answer)
+                answer = ask_charli(question, language)  # ask CHARLI in detected language
+                speak(answer)                  # 🔊 Speak the answer
 
             # Wait half a second before checking the button again
-            # (prevents one press from triggering multiple times)
             time.sleep(0.5)
 
         # Check the button every 50ms — fast enough to feel instant
         time.sleep(0.05)
 
 except KeyboardInterrupt:
-    # Clean up the GPIO when you quit with Ctrl+C
     print("\n👋 CHARLI Home shutting down. Goodbye!")
     GPIO.cleanup()
 ```
+
+> **See how clean that is?** The main loop is just 4 lines:
+> 1. `record_audio()` — record your voice
+> 2. `transcribe(audio_file)` — turn it into text
+> 3. `ask_charli(question, language)` — ask CHARLI in the detected language
+> 4. `speak(answer)` — say the answer out loud
+>
+> Each building block handles all the complicated stuff inside. That's how real programs are built — small pieces that each do one thing well, connected together.
 
 **Run it:**
 ```bash
@@ -908,7 +933,7 @@ sudo -E python3 charli_home.py
 
 # 📋 PHASE 3: The Display — Wobble Orb + Subtitles
 
-> This comes in Sunday Session 2. Phase 2 must be fully working first.
+> **Optional for Saturday afternoon** -- only attempt if Phase 2 voice pipeline is fully working.
 
 ## `src/display.py`
 
@@ -1149,142 +1174,347 @@ def start():
     print("✅ Display started")
 ```
 
-## Updating `charli_home.py` to Use the Display (Phase 3 addition)
+## Updating `charli_home.py` to Use the Display
 
-Add these lines to `charli_home.py` when you're ready for the display:
+> We just add one more building block import and wrap each pipeline step with display state changes. The main app stays clean and readable.
+
+Replace `charli_home.py` with this updated version:
+
+```bash
+nano ~/charli-home/charli_home.py
+```
 
 ```python
-# Add this import near the top
-from src.display import set_state, start as display_start
+#!/usr/bin/env python3
+"""
+CHARLI Home — Version 0.2 (with display)
+  Button A → Record → Whisper → CHARLI → Speak
+  + Wobble Orb display shows what's happening at each step
 
-# Add this near startup (after GPIO setup)
-display_start()
+Team: Christian & Isabella Bermeo
+Date: 2026-02-21
+"""
 
-# Then wrap each pipeline step:
-set_state("listening", "Listening...")
-record()
+import time
+import RPi.GPIO as GPIO
 
-question = transcribe()
+# ── Import our building blocks ────────────────────────────────────────
+from src.record import record_audio
+from src.transcribe import transcribe
+from src.ask_charli import ask_charli
+from src.speak import speak
+from src.display import set_state, start as start_display   # NEW building block
 
-set_state("thinking", question)
-answer = ask(question)
 
-set_state("speaking", answer)
-speak(answer)
+# ── Settings ──────────────────────────────────────────────────────────
+BUTTON_A = 5
 
+# ── Set up ────────────────────────────────────────────────────────────
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(BUTTON_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+start_display()
+
+# ── Main loop ─────────────────────────────────────────────────────────
+print("✅ CHARLI Home is ready! Press Button A to speak.")
 set_state("idle")
+
+try:
+    while True:
+        if GPIO.input(BUTTON_A) == GPIO.LOW:
+
+            set_state("listening", "Listening...")
+            audio_file = record_audio()
+
+            set_state("thinking", "Thinking...")
+            question, language = transcribe(audio_file)
+
+            if question:
+                set_state("thinking", question)
+                answer = ask_charli(question, language)
+
+                set_state("speaking", answer)
+                speak(answer)
+
+            set_state("idle")
+            time.sleep(0.5)
+
+        time.sleep(0.05)
+
+except KeyboardInterrupt:
+    print("\n👋 CHARLI Home shutting down. Goodbye!")
+    GPIO.cleanup()
 ```
+
+> **See what happened?** We added ONE new import (`from src.display import ...`) and wrapped each step with `set_state()`. The display building block handles all the animation, orb drawing, and subtitle rendering. The main app just tells it what state we're in. That's the power of building blocks.
 
 ---
 
 # 📋 PHASE 4: Natural Voice with Piper TTS
 
 > Upgrade from the robotic espeak voice to something that sounds much more natural.
+> We do this by replacing the `speak.py` building block — the main app doesn't change at all!
+
+### Step 4.1 — Install Piper and Download a Voice
 
 ```bash
+cd ~/charli-home
+source .venv/bin/activate
+
 pip install piper-tts
 
 mkdir -p ~/charli-home/voices
 cd ~/charli-home/voices
 
-# Download the voice model (Amy — natural US English female voice)
-wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx
-wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json
+# English: Alan -- British male voice (clean, JARVIS-style)
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/en_GB-alan-medium.onnx
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/en_GB-alan-medium.onnx.json
+
+# Spanish: mls_10246 -- Castilian Spanish male (elegant)
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_ES/mls_10246/low/es_ES-mls_10246-low.onnx
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_ES/mls_10246/low/es_ES-mls_10246-low.onnx.json
 ```
 
-Replace the `speak()` function in `charli_home.py` with:
+### Step 4.2 — Update the `src/speak.py` Building Block
 
-```python
-def speak(text: str):
-    """Speaks using Piper TTS — much more natural voice than espeak."""
-    text = text.replace("*", "").replace("#", "").replace("`", "")
-    subprocess.run(
-        f'echo "{text}" | '
-        f'piper --model ~/charli-home/voices/en_US-amy-medium.onnx --output_raw | '
-        f'paplay --raw --rate=22050 --format=s16le --channels=1',
-        shell=True
-    )
-```
-
----
-
-# 📋 PHASE 5: Wake Word "Charli"
-
-> Instead of pressing a button, just say "Charli" and she wakes up.
+> We're replacing the old building block with a better one. Since `charli_home.py` just calls `speak(text)`, we only need to change what happens inside — the main app stays exactly the same.
 
 ```bash
-pip install openwakeword pyaudio
+nano ~/charli-home/src/speak.py
 ```
 
 ```python
 #!/usr/bin/env python3
 """
-Phase 5: Wake word detection
-Instead of pressing a button, the Pi always listens for the word "Charli".
-When it hears it, it runs the full voice pipeline automatically.
+CHARLI Home - Building Block 4: Convert text into speech and play it.
+UPGRADED in Phase 4: now uses Piper TTS for a natural-sounding voice.
+
+The function name is still speak(text) — same interface, better voice.
+charli_home.py doesn't need to change at all!
 """
-from openwakeword.model import Model
-import pyaudio
-import numpy as np
 
-# Load a wake word model (we'll train a custom "Charli" model in the future)
-oww_model = Model(wakeword_models=["hey_jarvis"])  # placeholder
+import subprocess
 
-def listen_for_wakeword():
-    """Streams audio from the mic and waits until the wake word is detected."""
-    pa = pyaudio.PyAudio()
-    stream = pa.open(
-        format=pyaudio.paInt16,
-        channels=1,
-        rate=16000,
-        input=True,
-        frames_per_buffer=1280
+
+def speak(text: str):
+    """
+    Takes a text string and speaks it out loud through the speaker.
+    Uses Piper TTS with the Alan (British male) voice model.
+    """
+
+    # Remove any markdown formatting that might have slipped through
+    text = text.replace("*", "").replace("#", "").replace("`", "")
+
+    print(f"🔊 Speaking: '{text}'")
+
+    # Pipe the text through Piper TTS → raw audio → paplay (the audio player)
+    subprocess.run(
+        f'echo "{text}" | '
+        f'piper --model ~/charli-home/voices/en_GB-alan-medium.onnx --output_raw | '
+        f'paplay --raw --rate=22050 --format=s16le --channels=1',
+        shell=True
     )
 
-    print("👂 Listening for 'Charli'...")
-    set_state("idle")
 
-    while True:
-        # Read a small chunk of audio
-        raw_audio = stream.read(1280, exception_on_overflow=False)
-        audio_chunk = np.frombuffer(raw_audio, dtype=np.int16)
-
-        # Check if the wake word was detected
-        predictions = oww_model.predict(audio_chunk)
-        if any(confidence > 0.7 for confidence in predictions.values()):
-            print("🎯 Wake word 'Charli' detected!")
-            stream.stop_stream()
-            pa.terminate()
-            return  # Hand off to the recording pipeline
+# ── Test it ───────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    speak("Hello! I am CHARLI. This is my new natural voice. Much better, right?")
 ```
 
-**Training a custom "Charli" wake word — Isabella's Phase 5 project:**
-1. Record 50 samples of you saying "Charli" in different ways (tired, excited, normal)
-2. Isabella records 50 samples of her saying "Charli"
-3. Madam records 50 samples
-4. Upload to openWakeWord trainer
-5. The model now recognizes all three voices saying "Charli"
+**Test it:**
+```bash
+python3 src/speak.py
+```
 
-Isabella literally trains an AI model with her own voice. 🎤
+> **👩‍💻 Isabella: notice that we ONLY changed `src/speak.py` — the main app `charli_home.py` didn't change at all! That's the beauty of building blocks: you can swap one piece for a better version without touching the rest of the program.**
 
 ---
+
+# 📋 PHASE 5: Wake Word "Hey Charli"
+
+> Instead of pressing a button, just say "Hey Charli" and she wakes up.
+> We use **Picovoice Porcupine** -- no recording yourself 50 times, no training required.
+> You type the wake word on their website, download one file, and it just works.
+
+### Step 5.0 -- Create Your Wake Words (5 minutes, done once)
+
+> We're using TWO wake words: **"Hey Charli"** and **"Charli"**.
+> Both will trigger the assistant. Porcupine free tier supports up to 3 simultaneously.
+
+1. Go to **https://console.picovoice.ai** and create a free account
+2. Click **Wake Word** -> **Create Custom Wake Word**
+3. Create the first wake word: `hey charli` -- download as `hey-charli_raspberry-pi.ppn`
+4. Create the second wake word: `charli` -- download as `charli_raspberry-pi.ppn`
+5. Select platform: **Raspberry Pi** for both
+6. Copy both files to the Pi:
+   ```bash
+   scp ~/Downloads/hey-charli_raspberry-pi.ppn charli@charli-home.local:~/charli-home/
+   scp ~/Downloads/charli_raspberry-pi.ppn charli@charli-home.local:~/charli-home/
+   ```
+7. In your Picovoice Console, copy your **Access Key** -- you'll need it below.
+
+### Step 5.1 -- Install Porcupine Libraries
+
+> Porcupine includes `pvrecorder` -- its own audio capture library.
+> No `pyaudio` needed. One less dependency to install.
+
+```bash
+cd ~/charli-home
+source .venv/bin/activate
+pip install pvporcupine pvrecorder
+```
+
+### Step 5.2 -- Write the Wake Word Building Block
+
+```bash
+nano ~/charli-home/src/wakeword.py
+```
+
+```python
+#!/usr/bin/env python3
+"""
+CHARLI Home - Building Block 5: Wake word detection.
+Uses Picovoice Porcupine to listen for "Hey Charli".
+
+No training required. Download the .ppn file from console.picovoice.ai
+and paste your access key below. That's it.
+"""
+
+import pvporcupine
+import pvrecorder
+
+# ---- Configuration -------------------------------------------------------
+# Paste your Picovoice Access Key here (from console.picovoice.ai)
+ACCESS_KEY = "paste-your-access-key-here"
+
+# Both wake word files -- either phrase wakes the assistant
+KEYWORD_PATHS = [
+    "/home/charli/charli-home/hey-charli_raspberry-pi.ppn",  # "Hey Charli"
+    "/home/charli/charli-home/charli_raspberry-pi.ppn",      # "Charli"
+]
+KEYWORD_LABELS = ["Hey Charli", "Charli"]
+
+
+# ---- Initialize Porcupine ------------------------------------------------
+porcupine = pvporcupine.create(
+    access_key=ACCESS_KEY,
+    keyword_paths=KEYWORD_PATHS
+)
+
+# pvrecorder captures audio at the correct frame size
+recorder = pvrecorder.PvRecorder(frame_length=porcupine.frame_length)
+
+
+def wait_for_wakeword():
+    """
+    Listens until "Hey Charli" OR "Charli" is detected, then returns.
+    Either phrase wakes the assistant.
+    """
+
+    print("👂 Listening for 'Charli' or 'Hey Charli'...")
+    recorder.start()
+
+    try:
+        while True:
+            pcm = recorder.read()
+            # -1 = no wake word; >= 0 = index of detected keyword
+            result = porcupine.process(pcm)
+            if result >= 0:
+                label = KEYWORD_LABELS[result]
+                print(f"🎯 '{label}' detected!")
+                return
+    finally:
+        recorder.stop()
+
+
+# ---- Test it -------------------------------------------------------------
+if __name__ == "__main__":
+    print("Say 'Charli' or 'Hey Charli'...")
+    wait_for_wakeword()
+    print("Wake word detected!")
+```
+
+**Test it:**
+```bash
+python3 src/wakeword.py
+```
+
+Say "Charli" or "Hey Charli" -- you should see which one was detected. Done. ✅
+
+### Step 5.3 -- Update `charli_home.py` to Use Wake Word
+
+```bash
+nano ~/charli-home/charli_home.py
+```
+
+```python
+#!/usr/bin/env python3
+"""
+CHARLI Home -- Version 0.3 (with wake word)
+  Say "Hey Charli" -> Record -> Whisper -> CHARLI -> Speak -> Display
+
+Team: Christian & Isabella Bermeo
+"""
+
+# ---- Import our building blocks ------------------------------------------
+from src.record import record_audio
+from src.transcribe import transcribe
+from src.ask_charli import ask_charli
+from src.speak import speak
+from src.display import set_state, start as start_display
+from src.wakeword import wait_for_wakeword   # NEW
+
+
+# ---- Set up --------------------------------------------------------------
+start_display()
+
+# ---- Main loop -----------------------------------------------------------
+print("✅ CHARLI Home is ready! Say 'Hey Charli' to wake her up.")
+
+try:
+    while True:
+        set_state("idle")
+        wait_for_wakeword()                    # Listen for wake word
+
+        set_state("listening", "Listening...")
+        audio_file = record_audio()            # Record voice
+
+        set_state("thinking", "Thinking...")
+        question, language = transcribe(audio_file)      # voice -> text + language
+
+        if question:
+            set_state("thinking", question)
+            answer = ask_charli(question, language)      # ask in detected language
+
+            set_state("speaking", answer)
+            speak(answer)                      # Speak the answer
+
+except KeyboardInterrupt:
+    print("\n👋 CHARLI Home shutting down. Goodbye!")
+```
+
+> **Note:** We removed `import RPi.GPIO` entirely -- Porcupine handles its own audio capture, so no GPIO button setup needed anymore. Simpler.
 
 # 🗃️ Final File Structure
 
 ```
 charli-home/
-├── README.md               ← this file
-├── charli_home.py          ← main app (run this)
-├── .venv/                  ← Python virtual environment
-├── voices/                 ← Piper TTS voice models (Phase 4)
-│   ├── en_US-amy-medium.onnx
-│   └── en_US-amy-medium.onnx.json
-└── src/
-    ├── record.py           ← Isabella's first script 🎨
-    ├── transcribe.py       ← Whisper speech-to-text
-    ├── ask_charli.py       ← talks to real CHARLI via OpenClaw
-    ├── speak.py            ← text-to-speech output
-    └── display.py          ← Wobble Orb + subtitles (Phase 3)
+├── README.md               <- this file
+├── charli_home.py          <- main app -- imports and connects the building blocks
+├── hey-charli_raspberry-pi.ppn  <- wake word 1 (picovoice.ai)
+├── charli_raspberry-pi.ppn       <- wake word 2 (picovoice.ai)
+├── .venv/                  <- Python virtual environment
+├── voices/                 <- Piper TTS voice models (Phase 4)
+│   ├── en_GB-alan-medium.onnx          <- English: British male (JARVIS-style)
+│   ├── en_GB-alan-medium.onnx.json
+│   ├── es_ES-mls_10246-low.onnx        <- Spanish: Castilian male (elegant)
+│   └── es_ES-mls_10246-low.onnx.json
+└── src/                    <- the building blocks (each does ONE thing)
+    ├── record.py           <- records audio from the mic
+    ├── transcribe.py       <- converts audio to text (Whisper)
+    ├── ask_charli.py       <- sends question to CHARLI, gets answer
+    ├── speak.py            <- speaks text out loud (espeak -> Piper)
+    ├── display.py          <- Wobble Orb + subtitles (Phase 3)
+    └── wakeword.py         <- listens for "Hey Charli" (Porcupine, Phase 5)
 ```
 
 ---
@@ -1305,12 +1535,14 @@ charli-home/
 
 ---
 
-# ☑️ Sunday Session Checklist
+# ☑️ Saturday Build Day Checklist
 
 ### Phase 0 — Setup
 - [ ] 32GB microSD flashed with Raspberry Pi OS
+- [ ] Active Cooler installed on the Pi 5 CPU
 - [ ] Pi 5 boots from microSD
 - [ ] EEPROM bootloader updated (`sudo rpi-eeprom-update -a`)
+- [ ] M.2 HAT+ installed with NVMe SSD + GPIO header extender
 - [ ] NVMe SSD cloned and Pi boots from it
 - [ ] SSH working from Mac: `ssh charli@charli-home.local`
 - [ ] System tools installed (git, espeak-ng, libportaudio2...)
@@ -1336,8 +1568,37 @@ charli-home/
 - [ ] `src/speak.py` → audio plays through Bluetooth speaker
 - [ ] `charli_home.py` full loop: **button → question → CHARLI answers** 🎉🎉🎉
 
+### Phase 3 — Display (if time allows)
+- [ ] `src/display.py` created and tested
+- [ ] Orb changes color based on state (idle / listening / thinking / speaking)
+- [ ] Subtitles appear at bottom of screen
+
+### Phase 4 — Natural Voice (if time allows)
+- [ ] `pip install piper-tts` installed
+- [ ] Alan (British male) voice downloaded: `en_GB-alan-medium.onnx`
+- [ ] Spanish voice downloaded: `es_ES-mls_10246-low.onnx`
+- [ ] `src/speak.py` upgraded to Piper -- test both voices
+
+### Phase 5 — Wake Word (if time allows)
+- [ ] Picovoice account created at console.picovoice.ai
+- [ ] "hey charli" wake word created and `.ppn` file downloaded
+- [ ] "charli" wake word created and `.ppn` file downloaded
+- [ ] Both `.ppn` files copied to the Pi
+- [ ] `pip install pvporcupine pvrecorder`
+- [ ] Access key configured in `src/wakeword.py`
+- [ ] Wake word test: say "Charli" → terminal confirms detection ✅
+- [ ] `charli_home.py` Phase 5 version running: **say "Charli" → CHARLI answers** 🎉
+
+### Pre-Saturday Prep (do the night before)
+- [ ] Download both `.ppn` files from console.picovoice.ai
+- [ ] Download Piper voice models (`en_GB-alan-medium.onnx`, `es_ES-mls_10246-low.onnx`)
+- [ ] Confirm Tailscale is running on Mac Mini
+- [ ] Confirm OpenClaw gateway is running on Mac Mini
+- [ ] Charge the Bluetooth speaker
+- [ ] Have keyboard + mouse + monitor ready for first boot
+
 ---
 
-*The moment Isabella presses the button, asks Charli something, and hears Charli answer — that's the moment everything clicks. That's what we're building toward.*
+*The moment Isabella presses the button, asks Charli something, and hears Charli answer -- that's the moment everything clicks. That's what we're building toward.*
 
-*— CHARLI, 2026*
+*-- CHARLI, 2026*
