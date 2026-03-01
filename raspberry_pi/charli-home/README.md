@@ -466,7 +466,9 @@ pip install openai-whisper
 pip install openai
 
 # GPIO -- lets Python control the Pi's buttons (Phase 2 only)
-pip install RPi.GPIO
+# Pi 5 uses a new RP1 chip -- the old RPi.GPIO library does NOT work.
+# gpiozero is the modern library, and lgpio is the low-level driver it needs on Pi 5.
+pip install gpiozero lgpio
 
 # Display libraries — for the Wobble Orb animation
 pip install st7789 pillow pygame
@@ -816,25 +818,39 @@ In Phase 4 we'll swap this building block for a better one (Piper TTS).
 import subprocess
 
 
+VOICE_MAP = {
+    "en": "en",    # English
+    "es": "es",    # Spanish
+}
+
+
 def speak(text: str, language: str = "en"):
     """
     Takes a text string and speaks it out loud through the speaker.
-    The language parameter is accepted for API compatibility with Phase 4
-    but espeak uses a single voice for now -- upgraded in Phase 4.
+    Pass the language code from Whisper so espeak uses the right voice.
     Example: speak("Hello Sir, it is 72 degrees outside.")
+    Example: speak("Hola, hace buen tiempo.", "es")
     """
+
+    if not text:
+        print("⚠️ Nothing to say.")
+        return
 
     # Remove any markdown formatting that might have slipped through
     # (asterisks, pound signs, backticks — these sound weird when spoken)
     text = text.replace("*", "").replace("#", "").replace("`", "")
 
-    print(f"🔊 Speaking: '{text}'")
+    # Pick the right voice for the detected language
+    voice = VOICE_MAP.get(language, "en")
+    print(f"🔊 Speaking ({voice})...")
 
-    # Run espeak-ng — a text-to-speech program
-    # -v en-us+f3  → American English, female voice #3
-    # -s 155       → speed (155 words per minute — natural conversation speed)
-    # -p 45        → pitch (45 is a natural-sounding pitch)
-    subprocess.run(["espeak-ng", "-v", "en-us+f3", "-s", "155", "-p", "45", text])
+    # Run espeak-ng — a text-to-speech program installed with apt
+    try:
+        subprocess.run(["espeak-ng", "-v", voice, text], check=True)
+    except FileNotFoundError:
+        print("❌ espeak-ng not found. Install it with: sudo apt install espeak-ng")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ espeak-ng error: {e}")
 
 
 # ── Test it ───────────────────────────────────────────────────────────
@@ -877,8 +893,10 @@ Date: 2026-02-21
 
 import time
 
-# Hardware control for the button
-import RPi.GPIO as GPIO
+# gpiozero is the modern GPIO library for Raspberry Pi.
+# It works on Pi 5 (which has a new RP1 chip). The old RPi.GPIO does NOT work on Pi 5.
+# gpiozero uses "lgpio" as its driver on Pi 5 — we installed both with pip.
+from gpiozero import Button
 
 # ── Import our building blocks ────────────────────────────────────────
 # Each of these is a file Isabella wrote in the src/ folder.
@@ -890,12 +908,9 @@ from src.speak import speak                  # Step 4: answer → spoken aloud
 
 
 # ── Settings ──────────────────────────────────────────────────────────
-BUTTON_A = 5   # GPIO pin for Button A on Pirate Audio HAT
-
-
-# ── Set up the button ─────────────────────────────────────────────────
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(BUTTON_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+# GPIO pin 5 = Button A on the Pirate Audio HAT (BCM numbering)
+# gpiozero uses BCM pin numbers by default, so pin 5 = GPIO5 = physical pin 29
+button = Button(5)
 
 
 # ── Main loop ─────────────────────────────────────────────────────────
@@ -904,18 +919,19 @@ print("Waiting for button press... (Ctrl+C to quit)")
 
 try:
     while True:
-        # Check if Button A is being pressed (LOW = pressed)
-        if GPIO.input(BUTTON_A) == GPIO.LOW:
+        # Check if Button A is being pressed
+        if button.is_pressed:
 
             # Run the full pipeline — each step uses a building block
             audio_file = record_audio()        # 🎤 Record your voice
 
-            question, language = transcribe(audio_file)  # voice -> text + language
+            if audio_file:
+                question, language = transcribe(audio_file)  # voice -> text + language
 
-            # Only ask CHARLI if we actually heard something
-            if question:
-                answer = ask_charli(question, language)  # ask CHARLI in detected language
-                speak(answer)                  # 🔊 Speak the answer
+                # Only ask CHARLI if we actually heard something
+                if question:
+                    answer = ask_charli(question, language)  # ask CHARLI in detected language
+                    speak(answer, language)                   # 🔊 Speak the answer
 
             # Wait half a second before checking the button again
             time.sleep(0.5)
@@ -925,14 +941,13 @@ try:
 
 except KeyboardInterrupt:
     print("\n👋 CHARLI Home shutting down. Goodbye!")
-    GPIO.cleanup()
 ```
 
 > **See how clean that is?** The main loop is just 4 lines:
 > 1. `record_audio()` — record your voice
 > 2. `transcribe(audio_file)` — turn it into text
 > 3. `ask_charli(question, language)` — ask CHARLI in the detected language
-> 4. `speak(answer)` — say the answer out loud
+> 4. `speak(answer, language)` — say the answer out loud in the right language
 >
 > Each building block handles all the complicated stuff inside. That's how real programs are built — small pieces that each do one thing well, connected together.
 
@@ -943,7 +958,7 @@ source .venv/bin/activate
 sudo -E python3 charli_home.py
 ```
 
-> **Why `sudo -E`?** `sudo` runs as admin (needed for GPIO). The `-E` flag passes your environment variables (CHARLI_HOST and CHARLI_TOKEN) to the sudo session so they're available.
+> **Why `sudo -E`?** `sudo` runs as admin (needed for GPIO access). The `-E` flag passes your environment variables (CHARLI_HOST, CHARLI_TOKEN, and your .venv paths) to the sudo session so they're available. Without `-E`, sudo wipes your env and Python won't find your packages or CHARLI's connection info.
 
 **Press Button A → ask Charli something → hear her respond. That's the moment. 🎉**
 
@@ -1214,7 +1229,7 @@ Date: 2026-02-21
 """
 
 import time
-import RPi.GPIO as GPIO
+from gpiozero import Button
 
 # ── Import our building blocks ────────────────────────────────────────
 from src.record import record_audio
@@ -1225,11 +1240,9 @@ from src.display import set_state, start as start_display   # NEW building block
 
 
 # ── Settings ──────────────────────────────────────────────────────────
-BUTTON_A = 5
+button = Button(5)   # GPIO5 = Button A on Pirate Audio HAT
 
 # ── Set up ────────────────────────────────────────────────────────────
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(BUTTON_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 start_display()
 
 # ── Main loop ─────────────────────────────────────────────────────────
@@ -1238,20 +1251,21 @@ set_state("idle")
 
 try:
     while True:
-        if GPIO.input(BUTTON_A) == GPIO.LOW:
+        if button.is_pressed:
 
             set_state("listening", "Listening...")
             audio_file = record_audio()
 
-            set_state("thinking", "Thinking...")
-            question, language = transcribe(audio_file)
+            if audio_file:
+                set_state("thinking", "Thinking...")
+                question, language = transcribe(audio_file)
 
-            if question:
-                set_state("thinking", question)
-                answer = ask_charli(question, language)
+                if question:
+                    set_state("thinking", question)
+                    answer = ask_charli(question, language)
 
-                set_state("speaking", answer)
-                speak(answer)
+                    set_state("speaking", answer)
+                    speak(answer, language)
 
             set_state("idle")
             time.sleep(0.5)
@@ -1260,7 +1274,6 @@ try:
 
 except KeyboardInterrupt:
     print("\n👋 CHARLI Home shutting down. Goodbye!")
-    GPIO.cleanup()
 ```
 
 > **See what happened?** We added ONE new import (`from src.display import ...`) and wrapped each step with `set_state()`. The display building block handles all the animation, orb drawing, and subtitle rendering. The main app just tells it what state we're in. That's the power of building blocks.
@@ -1511,7 +1524,7 @@ except KeyboardInterrupt:
     print("\n👋 CHARLI Home shutting down. Goodbye!")
 ```
 
-> **Note:** We removed `import RPi.GPIO` entirely -- Porcupine handles its own audio capture, so no GPIO button setup needed anymore. Simpler.
+> **Note:** We removed `from gpiozero import Button` entirely -- Porcupine handles its own audio capture with the wake word, so no GPIO button setup needed anymore. Simpler.
 
 # 🗃️ Final File Structure
 
@@ -1551,6 +1564,9 @@ charli-home/
 | Whisper model slow first run | It's downloading 145MB. Wait for it — only happens once. |
 | Display stays black | Enable SPI in raspi-config (Step 1.2). Also check HAT is seated. |
 | `sudo: .venv not found` | Use `sudo -E python3` (the -E passes your venv environment to sudo) |
+| `RuntimeError: No access to /dev/mem` or GPIO errors | You need `sudo` to access GPIO. Run with `sudo -E python3 charli_home.py` |
+| `ImportError: RPi.GPIO` or `No module named RPi` | **Do NOT use RPi.GPIO on Pi 5** — it doesn't support the RP1 chip. Use `gpiozero` + `lgpio` instead. Run `pip install gpiozero lgpio` |
+| `lgpio` won't install via pip | Make sure you have build tools: `sudo apt install -y python3-dev build-essential`. Then retry `pip install lgpio` |
 
 ---
 
@@ -1578,7 +1594,7 @@ charli-home/
 
 ### Phase 2 — Voice Pipeline
 - [ ] Python venv created: `python3 -m venv .venv`
-- [ ] All packages installed (sounddevice, whisper, openai, RPi.GPIO, pygame...)
+- [ ] All packages installed (soundfile, whisper, openai, gpiozero, lgpio, pygame...)
 - [ ] `CHARLI_HOST` and `CHARLI_TOKEN` set in `.bashrc`
 - [ ] Gateway connection test with `curl` passes ✅
 - [ ] `src/record.py` written by Isabella ✏️ → button recording works

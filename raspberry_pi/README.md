@@ -231,4 +231,5 @@ sudo shutdown -h now
 - **NVMe boot**: If you have the M.2 HAT+, boot from NVMe instead of SD for much faster read/write. Use `sudo raspi-config` → Advanced → Boot Order.
 - **Backup your SD card**: `sudo dd if=/dev/mmcblk0 of=~/pi-backup.img bs=4M status=progress` — save an image you can flash back later.
 - **Temperature throttling**: The Pi 5 throttles at 85°C. If you're running AI workloads, the Active Cooler is a must. Check temp with `vcgencmd measure_temp`.
+- **Pi 5 GPIO — do NOT use `RPi.GPIO`**: The Pi 5 has a new RP1 chip. The old `RPi.GPIO` library doesn't support it and will fail silently or crash. Use `gpiozero` (high-level) with `lgpio` (low-level driver). Install both: `pip install gpiozero lgpio`.
 - **Pin numbering**: gpiozero uses BCM (Broadcom) pin numbers by default, not physical pin numbers. Pin 5 in code = GPIO5 = physical pin 29.

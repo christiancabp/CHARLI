@@ -37,7 +37,7 @@ try:
                 # Only ask CHARLI if we actually heard something
                 if question:
                     answer = ask_charli(question, language)  # ask CHARLI
-                    speak(answer)                            # 🔊 Speak
+                    speak(answer, language)                   # 🔊 Speak
 
             # Wait half a second before checking the button again
             time.sleep(0.5)
