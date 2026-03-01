@@ -4,7 +4,7 @@ So here is where we are Feb 2026. I have 0 experience with Raspberry Pi's and i 
 
 Also my oldest daughter is 11 and is showing some interest in programming. I hope to have her "help" me with some of these projects to build and learn together. I hope to inspire her and see if I spark some interest in her. She is super excited about how I am building you (CHARLI) and wants to be involved.
 
-**C.H.A.R.L.I.** Not only will you assist me on building cool Raspberry Pi projects but we will be building extensions of you to run on the Raspberry Pi like a "Google Home" like device with a tablet interfaces and automation projects we can triggrer through our n8n instance or via api. all projects we work on should exist in this directory `~raspberry_pi/projects`.
+**C.H.A.R.L.I.** Not only will you assist me on building cool Raspberry Pi projects but we will be building extensions of you to run on the Raspberry Pi like a "Google Home" like device with a tablet interfaces and automation projects we can triggrer through our n8n instance or via api. all projects we work on should exist in this directory `~raspberry_pi`.
 
 ## Motivation
 
@@ -44,3 +44,191 @@ Nooooww drumroll please...
 | Breadboard 830 points | 3 | Connecting components |
 | Jumper Wires | 1 | Connecting components |
 | Electronics precision tool kit | 1 | Tools for building |
+
+---
+
+## Raspberry Pi Cheat Sheet
+
+Quick reference for commands, tips, and tricks we pick up along the way.
+
+### SSH & Remote Access
+
+```bash
+# Connect to a Pi on your local network
+ssh charli@charli-home.local
+
+# Copy a file TO the Pi
+scp myfile.txt charli@charli-home.local:~/
+
+# Copy a file FROM the Pi
+scp charli@charli-home.local:~/myfile.txt .
+
+# Copy an entire folder
+scp -r myfolder charli@charli-home.local:~/
+```
+
+### System Info
+
+```bash
+# Check Pi model and hardware
+cat /proc/cpuinfo
+
+# Check OS version
+cat /etc/os-release
+
+# CPU temperature (keep it under 80°C)
+vcgencmd measure_temp
+
+# Memory usage
+free -h
+
+# Disk usage
+df -h
+
+# See all connected USB devices (mics, cameras, etc.)
+lsusb
+
+# See GPIO pin state
+pinout
+```
+
+### Package Management
+
+```bash
+# Update package lists & upgrade everything
+sudo apt update && sudo apt upgrade -y
+
+# Install a package
+sudo apt install -y <package-name>
+
+# Search for a package
+apt search <keyword>
+
+# Remove a package
+sudo apt remove <package-name>
+
+# Clean up unused packages
+sudo apt autoremove -y
+```
+
+### Python & Virtual Environments
+
+```bash
+# Create a virtual environment
+python3 -m venv .venv
+
+# Activate it
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run a script with sudo but keep your env vars (.venv, CHARLI_HOST, etc.)
+sudo -E python3 myscript.py
+
+# Check which python you're using (should point to .venv)
+which python3
+```
+
+### GPIO & Hardware
+
+```bash
+# List all GPIO pins and their current state
+gpioinfo
+
+# Quick test — read a pin value (gpiochip4 is Pi 5's main chip)
+gpioget gpiochip4 5
+
+# Detect audio devices (useful for mic setup)
+arecord -l
+
+# Test speaker output
+speaker-test -t wav -c 2
+
+# Test espeak-ng TTS
+espeak-ng "Hello from CHARLI"
+```
+
+### Networking & Tailscale
+
+```bash
+# Check your Pi's IP address
+hostname -I
+
+# Check Tailscale status
+tailscale status
+
+# Ping another Tailscale device
+tailscale ping <device-name>
+
+# See Tailscale IP
+tailscale ip
+
+# Test if a remote port is reachable
+curl -s -o /dev/null -w "%{http_code}" http://<host>:<port>/v1/models
+```
+
+### Services & Processes
+
+```bash
+# Run something in the background that survives SSH disconnect
+nohup sudo -E python3 charli_home.py &
+
+# Or better — use tmux
+tmux new -s charli          # start a named session
+# Ctrl+B then D to detach
+tmux attach -t charli       # reattach later
+
+# Check if a process is running
+ps aux | grep charli
+
+# Kill a process by name
+pkill -f charli_home.py
+
+# Check system logs
+journalctl -xe
+```
+
+### File System & Permissions
+
+```bash
+# Make a script executable
+chmod +x myscript.py
+
+# Change ownership (useful after sudo creates files)
+sudo chown -R charli:charli ~/charli-home
+
+# Find large files eating your disk
+du -sh * | sort -rh | head -10
+
+# Watch a log file in real time
+tail -f /var/log/syslog
+```
+
+### Raspberry Pi Config
+
+```bash
+# Open the Pi config tool (display, interfaces, boot, etc.)
+sudo raspi-config
+
+# Enable/disable interfaces from command line
+sudo raspi-config nonint do_ssh 0      # 0 = enable
+sudo raspi-config nonint do_i2c 0
+sudo raspi-config nonint do_spi 0
+
+# Safe reboot
+sudo reboot
+
+# Safe shutdown
+sudo shutdown -h now
+```
+
+### Tips & Tricks
+
+- **Always use `sudo -E`** when running Python scripts that need GPIO *and* environment variables — `sudo` alone wipes your env.
+- **Headless setup**: Place an empty file named `ssh` in the boot partition to enable SSH on first boot. For Wi-Fi, add `wpa_supplicant.conf`.
+- **Prevent SD card corruption**: Always `sudo shutdown -h now` before unplugging power.
+- **NVMe boot**: If you have the M.2 HAT+, boot from NVMe instead of SD for much faster read/write. Use `sudo raspi-config` → Advanced → Boot Order.
+- **Backup your SD card**: `sudo dd if=/dev/mmcblk0 of=~/pi-backup.img bs=4M status=progress` — save an image you can flash back later.
+- **Temperature throttling**: The Pi 5 throttles at 85°C. If you're running AI workloads, the Active Cooler is a must. Check temp with `vcgencmd measure_temp`.
+- **Pin numbering**: gpiozero uses BCM (Broadcom) pin numbers by default, not physical pin numbers. Pin 5 in code = GPIO5 = physical pin 29.

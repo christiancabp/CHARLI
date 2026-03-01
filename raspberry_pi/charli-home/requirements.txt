@@ -1,0 +1,6 @@
+soundfile
+numpy
+openai-whisper
+openai
+gpiozero
+RPi.GPIO

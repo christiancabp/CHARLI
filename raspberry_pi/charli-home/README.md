@@ -475,6 +475,19 @@ pip install st7789 pillow pygame
 ## Step 2.3 — Save CHARLI's Connection Info
 
 > The Pi needs to know WHERE to find CHARLI (Mac Mini's address) and a secret token to prove it's allowed to connect.
+> We use **Tailscale Serve** to expose Charli securely.
+
+### 1. Enable Tailscale Serve (On Mac Mini)
+Run this one-time command on the Mac to expose the API port (18789) to the Tailnet:
+
+```bash
+/Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg 18789
+```
+
+This will output a URL like `https://christians-mac-mini.tail6703fd.ts.net`.
+
+### 2. Configure the Raspberry Pi
+On the Raspberry Pi (`charli-home`), set the environment variables to point to the Tailscale URL.
 
 ```bash
 # Open the .bashrc file — this runs automatically every time you open a terminal
@@ -483,8 +496,9 @@ nano ~/.bashrc
 
 Scroll to the very bottom and add these two lines:
 ```bash
-export CHARLI_HOST="http://100.64.1.5:18789"   # ← replace with Mac Mini's Tailscale IP from Phase 0B
-export CHARLI_TOKEN="paste-your-token-here"     # ← see instructions below
+# Charli API Connection (Tailscale Serve)
+export CHARLI_HOST="https://christians-mac-mini.tail6703fd.ts.net"  # ← replace with YOUR URL if different
+export CHARLI_TOKEN="paste-your-token-here"                         # ← see instructions below
 ```
 
 Press **Ctrl+X** → **Y** → **Enter** to save.
@@ -510,8 +524,12 @@ Copy that value and paste it as CHARLI_TOKEN above.
 curl -s "$CHARLI_HOST/v1/chat/completions" \
   -H "Authorization: Bearer $CHARLI_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"model":"openclaw:main","messages":[{"role":"user","content":"Say hello in one sentence."}],"max_tokens":50,"user":"pi-home"}' \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['choices'][0]['message']['content'])"
+  -d '{
+    "model": "openclaw:main",
+    "messages": [{"role": "user", "content": "Hello via Tailscale Serve!"}],
+    "max_tokens": 50,
+    "user": "pi-home"
+  }' | python3 -c "import sys,json; print(json.load(sys.stdin)['choices'][0]['message']['content'])"
 ```
 
 If CHARLI responds — you're connected! ✅
@@ -1424,6 +1442,7 @@ def wait_for_wakeword():
                 return
     finally:
         recorder.stop()
+
 
 
 # ---- Test it -------------------------------------------------------------
