@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=800, height=480, initial-scale=1.0, user-scalable=no">
+    <title>C.H.A.R.L.I.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/charli.css">
+</head>
+<body>
+    <!-- Scan-line overlay for CRT/HUD effect -->
+    <div class="scanlines"></div>
+
+    <!-- Top status bar -->
+    <header class="status-bar">
+        <div class="status-left">
+            <span class="logo">C.H.A.R.L.I.</span>
+        </div>
+        <div class="status-right">
+            <span class="connection-dot" id="connectionDot"></span>
+            <span class="clock" id="clock"></span>
+        </div>
+    </header>
+
+    <!-- Main content area -->
+    <main class="main-content">
+        <!-- Left side: animated orb -->
+        <section class="orb-container">
+            <canvas id="orbCanvas" width="320" height="320"></canvas>
+            <div class="state-label" id="stateLabel">IDLE</div>
+        </section>
+
+        <!-- Right side: conversation transcript -->
+        <section class="transcript-container">
+            <div class="transcript-header">TRANSCRIPT</div>
+            <div class="transcript" id="transcript">
+                <div class="transcript-entry system">
+                    CHARLI Home initialized. Awaiting wake word...
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/js/orb.js"></script>
+    <script src="/static/js/charli.js"></script>
+</body>
+</html>
