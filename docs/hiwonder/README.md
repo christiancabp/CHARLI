@@ -1,0 +1,3 @@
+# HIWONDER AI VOICE SENSOR MODULE
+
+Bought this little guy online for 20 bucks. It's a small module that can be connected to a Raspberry Pi or Arduino to add voice recognition capabilities. It has a built-in microphone and speaker, and it can be programmed to recognize voice commands and respond with voice output. It also has a built-in LED that can be used to indicate the status of the module. I thought it could be helpful with the CHARLI home project. Or perhaps other robotic projects. Either way the goal is to use it as a voice interface I/O with wake word detection and local voice recognition built in.
