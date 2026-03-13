@@ -19,7 +19,7 @@ SAMPLE_RATE = 16000
 DURATION = 5
 
 # Mic configuration — override via environment variables
-MIC_DEVICE = os.environ.get("CHARLI_MIC_DEVICE", "plughw:1,0")
+MIC_DEVICE = os.environ.get("CHARLI_MIC_DEVICE", "hw:0,0")
 MIC_CHANNELS = int(os.environ.get("CHARLI_MIC_CHANNELS", "1"))
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

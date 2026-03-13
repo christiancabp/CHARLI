@@ -1,9 +1,12 @@
 soundfile
 numpy
-openai-whisper
+faster-whisper
 openai
 fastapi
 uvicorn[standard]
 websockets
 pvporcupine
 pvrecorder
+psutil
+textual
+websocket-client

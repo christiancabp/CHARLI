@@ -1,8 +1,8 @@
 # C.H.A.R.L.I. Home — Engineering Proposal & Architecture
-**Status:** DRAFT v1.0
+**Status:** v2.0 — Finalized
 **Owner:** Christian Bermeo ("Sir")
 **Architect:** C.H.A.R.L.I.
-**Date:** March 5, 2026
+**Date:** March 12, 2026
 
 ---
 
@@ -18,131 +18,231 @@ The connection backbone is **Tailscale**, creating a secure, flat mesh network w
 
 ---
 
-## 2. Communication Architecture: The Hybrid Model
+## 2. Decision: HiWonder WonderEcho Module
 
-We will use a **Hybrid HTTP + WebSocket** pattern. This optimizes for both transactional reliability and real-time responsiveness.
+**Verdict: NOT for CHARLI. Saved for a future robotics project.**
 
-### 2.1 The Protocols
+The WonderEcho ($20 I2C module) does offline command-word recognition — it matches ~300 pre-programmed words like "go forward." It **cannot transcribe free-form speech**. CHARLI needs to understand anything you say ("What's the weather?", "Tell me about black holes"), which requires Whisper STT. The built-in speaker is also too tiny for voice output. Perfect for a future robot arm/rover project.
+
+---
+
+## 3. Finalized Tech Stack
+
+| Component | Tool | Why |
+|---|---|---|
+| **Wake Word** | Porcupine (pvporcupine) | Accurate, supports Spanish, proven on Pi 5. Migrate to openWakeWord when it adds Spanish. |
+| **Recording** | `arecord` (ALSA subprocess) | Already works on the Pi (`hw:0,0`). Simple, reliable. |
+| **Speech-to-Text** | **faster-whisper** (base, INT8) | 4x faster than openai-whisper on Pi 5, ~200MB less RAM, no PyTorch. Same accuracy. |
+| **LLM Brain** | OpenClaw via OpenAI-compatible API | Runs on Mac Mini. Pi just sends text, gets text back. Token-efficient. |
+| **Text-to-Speech** | **espeak-ng** (Phase 1) → **Piper TTS** (Phase 4) | Start robotic but instant. Upgrade to near-human voice once core pipeline works. |
+| **Web UI** | FastAPI + vanilla HTML/CSS/JS | Primary UI. 800×480 JARVIS touchscreen in Chromium kiosk mode. |
+| **TUI** | Textual (Python) | Secondary UI. SSH-accessible monitoring. Same WebSocket as web UI. |
+| **State Sync** | WebSocket (FastAPI → browser/TUI) | Real-time state broadcast: IDLE/LISTENING/THINKING/SPEAKING |
+| **Pi↔Mac Link** | HTTP (questions) + WebSocket (state) | HTTP for Q&A (reliable, retryable). WebSocket for live state sync (zero token cost). |
+| **Deployment** | venv + systemd | Simplest. No Docker overhead. Revisit later if needed. |
+| **Network** | Tailscale | Already set up. Secure mesh, Pi and Mac Mini on same private network. |
+
+### Why faster-whisper over openai-whisper?
+
+| | openai-whisper | faster-whisper |
+|---|---|---|
+| Transcribe 5s audio on Pi 5 | ~10-15 seconds | ~3-4 seconds |
+| RAM usage | ~500MB (needs PyTorch) | ~300MB (CTranslate2, INT8) |
+| Install size | ~2GB | ~300MB |
+| Accuracy | Same | Same (identical model weights) |
+| Python API | `whisper.load_model("base")` | `WhisperModel("base", compute_type="int8")` |
+
+### RAM Budget (Pi 5, 8GB)
+
+| Component | RAM |
+|---|---|
+| Linux + systemd | ~300MB |
+| Chromium kiosk (1 tab) | ~250MB |
+| faster-whisper (base, INT8) | ~300MB |
+| FastAPI + uvicorn | ~50MB |
+| Porcupine | ~15MB |
+| Python + libs | ~80MB |
+| **Total** | **~1GB** |
+| **Free** | **~7GB** |
+
+---
+
+## 4. Communication Architecture: The Hybrid Model
+
+We use a **Hybrid HTTP + WebSocket** pattern. This optimizes for both transactional reliability and real-time responsiveness.
+
+### 4.1 The Protocols
 *   **HTTP (REST):** Used for *Transactional* events.
     *   *Example:* Pi sends transcribed text to Brain. Brain returns the final answer.
     *   *Why:* Request/Response is robust. If it fails, we retry.
+    *   *Endpoints:* `POST /api/speak`, `POST /api/ask`, `GET /api/status`, `GET /health`
 *   **WebSockets (State Sync):** Used for *Ephemera* and *Presence*.
-    *   *Example:* Brain tells Pi "I am thinking" (Pi starts animation). Brain tells Pi "CPU is high" (Pi updates HUD stats).
-    *   *Why:* Low latency, bi-directional. Keeps the "Eyes" alive without constantly polling the API.
+    *   *Example:* Brain tells Pi "I am thinking" (Pi starts animation). System metrics broadcast every 10s.
+    *   *Why:* Low latency, bi-directional. Keeps the UI alive without constantly polling.
 
-### 2.2 Token Usage & Cost Impact
+### 4.2 Token Usage & Cost Impact
 *   **Do Sockets cost tokens?** **NO.** Maintaining a WebSocket connection is purely network traffic (bytes). It costs $0.00.
-*   **Cost Driver:** Tokens are only consumed when the Mac Mini sends text to the LLM (Anthropic/Gemini) to generate an answer.
-*   **Efficiency:** This model might actually *save* tokens because the Pi can handle "wake word rejection" locally without bothering the Brain, and the Brain can push "status updates" (like system health) using local scripts, not LLM generation.
+*   **Cost Driver:** Tokens are only consumed when `ask_charli()` sends text to the LLM.
+*   **Efficiency:** Conversation context is capped at 3 turns (6 messages) to keep costs low while enabling follow-up questions.
 
-### 2.3 Step-by-Step Flow (The "Hybrid" Loop)
+### 4.3 Step-by-Step Flow
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Pi (Senses)
     participant Mac (Brain)
-    
+
     Note over Pi, Mac: WebSocket Connection Established (Heartbeat active)
-    
+
     User->>Pi: "Hey Charli..." (Wake Word)
     Pi->>Pi: Local Wake Word Detect
     Pi->>Mac: WS Event: {status: "listening"}
-    Note right of Pi: Eyes turn Teal (Listening)
-    
+    Note right of Pi: Orb turns Cyan (Listening)
+
     User->>Pi: "...what's the weather?"
-    Pi->>Pi: Whisper STT (Local) -> "what's the weather?"
-    
+    Pi->>Pi: faster-whisper STT (Local) -> "what's the weather?"
+
     Pi->>Mac: HTTP POST /v1/chat "what's the weather?"
     Mac->>Mac: LLM Processing...
     Mac->>Pi: WS Event: {status: "thinking"}
-    Note right of Pi: Eyes turn Orange (Computing animation)
-    
+    Note right of Pi: Orb turns Orange (Computing animation)
+
     Mac->>Pi: HTTP Response (200 OK): "It's 72 degrees."
-    
+
     par Parallel Actions
         Pi->>User: TTS Audio Output "It's 72 degrees."
-        Pi->>Pi: Update TUI Text Log
+        Pi->>Pi: Update Web UI + TUI Transcript
         Mac->>Pi: WS Event: {status: "idle"}
     end
-    Note right of Pi: Eyes return to Blue (Idle/Breathing)
+    Note right of Pi: Orb returns to Blue (Idle)
 ```
 
 ---
 
-## 3. User Interface: The Cyberdeck TUI
+## 5. User Interface
 
-We will build a **Terminal User Interface (TUI)** running natively on the Pi.
+### 5.1 Primary: JARVIS Web UI (Touchscreen)
 
-*   **Aesthetic:** "Cyberdeck" / "Hard Sci-Fi".
-    *   **Primary Colors:** Copper/Brass (#B87333), Amber (#FFB000), Deep Space Blue (#0B1026).
-    *   **Style:** Monospaced, high contrast, scanlines (optional).
-*   **Framework:** **Textual** (Python). It allows CSS-like styling for terminal apps and supports 60FPS animations.
-*   **Terminal Emulator:** We do not need the *app* Ghostty on the Pi (it requires heavy GPU libraries). We will run the TUI directly in the lightweight system console or a minimal emulator like `Alacritty` or `fbterm` (FrameBuffer Terminal) to keep resources free for Whisper. The *animation style* will mimic Ghostty's fluid shaders using ASCII block characters.
+The 7" touchscreen displays an animated JARVIS-style interface served by FastAPI in Chromium kiosk mode.
 
-### Layout Concept
-```text
-┌──────────────────────────────────────────────┐
-│  CPU: 42°C  |  MEM: 12%  |  NET: TAILSCALE   │ <─ System Bar (Brass)
-├──────────────────────────────────────────────┤
-│                                              │
-│            (  O  )      (  O  )              │ <─ Animated ASCIIEyes (White)
-│                                              │
-│           [ LISTENING... ]                   │
-│                                              │
-├──────────────────────────────────────────────┤
-│ > [17:42] Wake word detected                 │ <─ Log Stream (Amber)
-│ > [17:42] Transcribed: "Status report"       │
-│ > [17:42] Incoming: Audio stream (240kbps)   │
-└──────────────────────────────────────────────┘
-```
+*   **Animated Orb:** Canvas-based blob with state-aware visual profiles (blue=idle, cyan=listening, orange=thinking, gold=speaking)
+*   **Transcript:** Real-time conversation log with user (cyan) and CHARLI (amber) messages
+*   **Status Bar:** Clock, connection status, system metrics
+*   **Tech:** Vanilla HTML/CSS/JS — no build step, no framework
+
+### 5.2 Secondary: Cyberdeck TUI (SSH)
+
+A Textual-based Terminal UI accessible via SSH for monitoring and debugging.
+
+*   **Aesthetic:** Copper/Brass (#B87333), Amber (#FFB000), Deep Space Blue (#0B1026)
+*   **Features:** Live state display, conversation transcript, system metrics (CPU, RAM, Tailscale)
+*   **Connection:** Same `/ws` WebSocket endpoint as the web UI
+*   **Usage:** `python3 tui/charli_tui.py` or remote: `python3 tui/charli_tui.py --host charli-home`
 
 ---
 
-## 4. Network & Accessibility
+## 6. Network & Accessibility
 
-### 4.1 Tailscale Mesh (The "Home" Network)
+### 6.1 Tailscale Mesh (The "Home" Network)
 *   **Concept:** A private, encrypted overlay network.
 *   **Usage:**
     *   MacBook Terminal → `ssh charli@charli-home` (Manage the Pi).
-    *   MacBook CLI → `charli-cli chat "Dinner is ready"` (Sends text to Pi TTS).
-    *   MacBook CLI → `charli-cli report` (Queries Pi health sensors).
+    *   Mac can push commands to Pi via REST: `POST /api/speak` with "Dinner is ready"
+    *   Mac can query Pi health: `GET /api/status`
 *   **Security:** High. Only devices signed into your Tailscale account can even *see* the Pi.
 
-### 4.2 Cloudflare Tunnels (The "World" Access)
-*   **What it is:** A secure way to expose a local web server to the public internet without opening ports on your router.
-*   **Use Case:** If you build a React/Next.js dashboard for "Home Control," you can access it via `https://home.yourdomain.com` from a phone *without* Tailscale active.
-*   **Auth (Cloudflare Access):** We put an identity shield in front of it. When you visit the URL, Cloudflare asks for your email/PIN or GitHub login *before* the request ever touches the Pi. GitHub login is the recommended method.
-*   **Recommendation:** Start with Tailscale only (Simpler/Safer). Add Cloudflare Tunnel later if you need to give "Guest" access to someone without installing Tailscale on their device.
+### 6.2 Cloudflare Tunnels (Future — "World" Access)
+*   **Use Case:** Phone access without installing Tailscale.
+*   **Auth:** Cloudflare Access with GitHub login.
+*   **Status:** Deferred. Start with Tailscale only.
 
 ---
 
-## 5. Development Workflow: Docker & CI/CD
+## 7. Deployment: venv + systemd
 
-We will treat the Pi as a **Production Environment**. You do not code *on* the Pi; you code *for* the Pi.
+We use a simple Python virtual environment + systemd service instead of Docker. This avoids container overhead on the Pi and simplifies debugging for a learning project.
 
-### 5.1 The Workflow
-1.  **Dev (MacBook || Mac Mini):** You write code in VS Code.
-2.  **Build:** `docker buildx build --platform linux/arm64 ...` (Builds the Pi container on your powerful Mac).
-3.  **Push:** Push image to GitHub Container Registry (GHCR) or ECR (AWS Container Registry) TBD.
-4.  **Deploy:** Pi pulls the new image and restarts the container.
+### 7.1 Setup
+```bash
+python3 -m venv ~/charli-home/.venv
+source ~/charli-home/.venv/bin/activate
+pip install -r requirements.txt
+```
 
-### 5.2 Container Structure
-We will use a **Multi-Container (Docker Compose)** setup on the Pi:
+### 7.2 systemd Service
+```ini
+[Unit]
+Description=CHARLI Home Voice Assistant
+After=network.target bluetooth.target
 
-1.  **`charli-brain-link` (Backend):**
-    *   FastAPI Server (WebSockets + HTTP).
-    *   Whisper AI Engine.
-    *   Hardware control (GPIO, Camera, Audio).
-2.  **`charli-tui` (Frontend):**
-    *   Textual App.
-    *   Connects to `brain-link` via WebSocket (localhost) to get status/eyes.
-    *   *Why separate?* If the UI crashes, the voice assistant still works. If the assistant lags, the UI doesn't freeze.
+[Service]
+User=charli
+WorkingDirectory=/home/charli/charli-home
+ExecStart=/home/charli/charli-home/.venv/bin/python3 charli_home.py
+Restart=always
+RestartSec=5
+EnvironmentFile=/home/charli/.charli.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 7.3 Chromium Kiosk (autostart)
+```bash
+# ~/.config/autostart/charli-ui.desktop
+[Desktop Entry]
+Name=CHARLI UI
+Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars http://localhost:8080
+```
 
 ---
 
-## 6. Next Steps
+## 8. Phased Milestone Roadmap
 
-1.  **Repo Setup:** Convert `charli-home` into a proper repo structure with `docker-compose.yml`.
-2.  **Prototype TUI:** Build a "Hello World" Textual app on your Mac to test the eye animations.
-3.  **Prototype Sockets:** Create a simple script where the Mac Mini sends a "Blink" command and the TUI reacts.
+### Phase 1: Core Pipeline (Milestones 0-6)
+- [x] Pi setup, repo clone, venv, dependencies
+- [x] Recording (USB mic via arecord)
+- [x] Transcription (faster-whisper, base, INT8)
+- [x] LLM queries (OpenClaw via OpenAI client)
+- [x] Text-to-speech (espeak-ng)
+- [x] Wake word detection (Porcupine)
+- [x] Full voice pipeline orchestrator
+
+### Phase 2: User Interface (Milestone 7)
+- [x] JARVIS web UI (animated orb + transcript)
+- [x] WebSocket real-time state sync
+- [x] Chromium kiosk auto-launch
+
+### Phase 3: Intelligence Upgrades (Milestones 8-12)
+- [ ] Voice Activity Detection (stop on silence)
+- [x] Conversation context (3-turn memory)
+- [x] Pi↔Mac nervous system (WebSocket + REST)
+- [x] System monitoring (CPU, RAM, Tailscale)
+- [x] TUI companion (Textual)
+
+### Phase 4: Polish & Natural Voice
+- [ ] Piper TTS (upgrade from espeak-ng)
+- [ ] Conversation persistence (SQLite)
+- [ ] Dashboard widgets (quick-action touch buttons)
+- [ ] openWakeWord migration (when Spanish support arrives)
+
+### Phase 5: Future Expansion
+- [ ] Camera + vision ("What's on my desk?")
+- [ ] Home automation (MQTT, smart lights)
+- [ ] Cloudflare tunnel (phone access)
+- [ ] Pomodoro timer
+- [ ] Retro gaming (RetroPie)
+
+---
+
+## 9. Key Architecture Decisions
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| STT Engine | faster-whisper (not openai-whisper) | 4x faster, 200MB less RAM, no PyTorch |
+| Primary UI | Web (not TUI) | Touchscreen demands it; TUI is secondary for SSH |
+| Deployment | venv + systemd (not Docker) | Simpler for learning project, less Pi overhead |
+| Context Window | 3 turns max | Balances follow-up ability vs token cost |
+| Mic Device | hw:0,0 (not plughw:1,0) | Confirmed working on this Pi's USB mic |
+| HiWonder | Skip | Command-word only, can't do free-form speech |

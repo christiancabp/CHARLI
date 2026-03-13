@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-CHARLI Home — Version 1.0 (Desk Hub)
+CHARLI Home — Version 2.0 (Desk Hub)
 
-Async orchestrator that runs three subsystems concurrently:
+Async orchestrator that runs all subsystems concurrently:
   1. Wake word listener  (Porcupine — "Hey Charli")
   2. Voice pipeline      (record → transcribe → ask → speak)
   3. Web server          (FastAPI + WebSocket for JARVIS UI)
+  4. System monitor      (CPU temp, RAM, Tailscale status)
+  5. Mac Link            (persistent WebSocket to Mac Mini)
 
-No more GPIO or sudo needed — uses USB mic, Bluetooth speaker,
+No GPIO or sudo needed — uses USB mic, Bluetooth speaker,
 and a 7" touchscreen running Chromium in kiosk mode.
 """
 
@@ -24,6 +26,8 @@ from src.record import record_audio
 from src.transcribe import transcribe
 from src.ask_charli import ask_charli
 from src.speak import speak
+from src.system_monitor import monitor_loop
+from src.mac_link import MacLink
 
 # ── Web server (FastAPI app) ─────────────────────────────────────────
 from web.server import app as web_app
@@ -38,6 +42,10 @@ async def voice_pipeline(state: StateManager):
     """
     Runs the wake-word → record → transcribe → ask → speak loop
     in a background thread (blocking calls wrapped with run_in_executor).
+
+    Now passes conversation history to ask_charli() so CHARLI can
+    understand follow-up questions like "What about tomorrow?" after
+    you ask about weather.
     """
     loop = asyncio.get_event_loop()
     detector = WakeWordDetector()
@@ -70,8 +78,9 @@ async def voice_pipeline(state: StateManager):
             # Add user message to conversation
             state.add_message_sync("user", question)
 
+            # Pass conversation history for context-aware responses
             answer = await loop.run_in_executor(
-                None, ask_charli, question, language
+                None, ask_charli, question, language, state.conversation
             )
 
             # Add CHARLI's response to conversation
@@ -89,8 +98,10 @@ async def voice_pipeline(state: StateManager):
 
 async def run_web_server(state: StateManager):
     """Start the FastAPI/uvicorn web server as an async task."""
-    # Inject the shared state manager into the web server module
+    # Inject the shared state manager and building block functions
     web_server.state_manager = state
+    web_server.speak_fn = speak
+    web_server.ask_fn = ask_charli
 
     config = uvicorn.Config(
         web_app,
@@ -106,15 +117,22 @@ async def main():
     """Launch all subsystems concurrently."""
     state = StateManager()
     state._loop = asyncio.get_event_loop()
+    state.system_metrics = {}  # populated by system_monitor
 
-    print(f"CHARLI Home v1.0 — Desk Hub")
+    # Set up Mac Link (disabled if CHARLI_MAC_WS_URL not set)
+    mac_link = MacLink(state)
+    mac_link._speak_fn = speak
+
+    print(f"CHARLI Home v2.0 — Desk Hub")
     print(f"Web UI: http://localhost:{WEB_PORT}")
     print(f"Waiting for wake word... (Ctrl+C to quit)")
 
-    # Run web server and voice pipeline concurrently
+    # Run all subsystems concurrently
     await asyncio.gather(
         run_web_server(state),
         voice_pipeline(state),
+        monitor_loop(state),
+        mac_link.run(),
     )
 
 
