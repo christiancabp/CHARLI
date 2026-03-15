@@ -1,15 +1,20 @@
 // CHARLIAPIClient.swift
-// CHARLI Glasses - HTTP Client for CHARLI API
+// CHARLI Glasses - HTTP Client for CHARLI Server
 //
-// Handles communication between the iOS app and the CHARLI Glasses API
-// server. Sends audio recordings (and optionally images) to the server,
-// receives audio responses back.
+// Handles communication between the iOS app and the central CHARLI Server
+// (NestJS on Mac Mini). Sends audio recordings (and optionally images)
+// to the server, receives audio responses back.
 //
-// The server can run on:
-//   - The Raspberry Pi (http://charli-home.local:8090)
-//   - The Mac Mini directly (http://<tailscale-ip>:8090)
+// The server runs on the Mac Mini at port 3000, accessible via Tailscale.
+// All requests require an X-API-Key header for device authentication.
 //
-// All requests go through the Tailscale private network for security.
+// Endpoint mapping (old glasses API → new central server):
+//   /api/voice-query     → /api/pipeline/voice
+//   /api/voice-query-text → /api/pipeline/voice-text
+//   /api/ask-vision      → /api/ask/vision
+//   /api/ask             → /api/ask
+//   /api/conversation    → /api/conversation
+//   /health              → /health
 
 import Foundation
 import Combine
@@ -20,9 +25,11 @@ class CHARLIAPIClient: ObservableObject {
     @Published var lastQuestion: String?
     @Published var lastResponse: String?
 
-    // Server URL — configurable via Settings or hardcoded for now.
-    // This points to wherever the CHARLI Glasses API server is running.
+    // Server URL — points to the central CHARLI Server on Mac Mini.
     private let baseURL: String
+
+    // API key for device authentication (registered in charli_server DB).
+    private let apiKey: String
 
     // URL session for HTTP requests
     private let session = URLSession.shared
@@ -31,10 +38,14 @@ class CHARLIAPIClient: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        // Default to the Raspberry Pi's address on Tailscale.
-        // In production, this would come from UserDefaults/Settings.
-        self.baseURL = UserDefaults.standard.string(forKey: "charli_api_url")
-            ?? "http://charli-home.local:8090"
+        // CHARLI Server URL — Mac Mini on Tailscale (port 3000).
+        // Configurable via UserDefaults for testing different servers.
+        self.baseURL = UserDefaults.standard.string(forKey: "charli_server_url")
+            ?? "http://charli-server:3000"
+
+        // API key for the glasses device (created by charli_server seed/registration).
+        self.apiKey = UserDefaults.standard.string(forKey: "charli_api_key")
+            ?? ""
 
         // Start health check polling
         startHealthCheck()
@@ -48,8 +59,13 @@ class CHARLIAPIClient: ObservableObject {
         )
     }
 
+    // ── Common Headers ────────────────────────────────────────────
+    // All API requests include the device API key for authentication.
+    private func authHeaders() -> [String: String] {
+        return ["X-API-Key": apiKey]
+    }
+
     // ── Health Check ────────────────────────────────────────────
-    // Poll the server every 10 seconds to check if it's alive.
     private func startHealthCheck() {
         Timer.publish(every: 10, on: .main, in: .common)
             .autoconnect()
@@ -58,13 +74,13 @@ class CHARLIAPIClient: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Also check immediately
         checkHealth()
     }
 
     private func checkHealth() {
         guard let url = URL(string: "\(baseURL)/health") else { return }
 
+        // Health endpoint does not require auth
         session.dataTask(with: url) { [weak self] data, response, error in
             let connected = (response as? HTTPURLResponse)?.statusCode == 200
             DispatchQueue.main.async {
@@ -74,13 +90,12 @@ class CHARLIAPIClient: ObservableObject {
     }
 
     // ── Voice Query (Full Pipeline) ─────────────────────────────
-    // Send recorded audio to CHARLI, get audio response back.
+    // Send recorded audio to CHARLI Server, get audio response back.
     //
-    // This is the main function called after recording finishes:
-    //   1. Read the WAV file from disk
-    //   2. POST to /api/voice-query as multipart form data
-    //   3. Receive WAV audio response
-    //   4. Pass audio data to AudioManager for playback
+    // Endpoint: POST /api/pipeline/voice
+    // Input:  multipart form — audio file + optional image file
+    // Output: WAV audio response
+    // Headers: X-Transcription, X-Language, X-Answer (URL-encoded)
 
     @objc private func handleRecordingReady(_ notification: Notification) {
         guard let url = notification.userInfo?["url"] as? URL else { return }
@@ -88,14 +103,18 @@ class CHARLIAPIClient: ObservableObject {
     }
 
     func sendVoiceQuery(audioURL: URL, imageData: Data? = nil) {
-        guard let url = URL(string: "\(baseURL)/api/voice-query") else {
+        guard let url = URL(string: "\(baseURL)/api/pipeline/voice") else {
             print("❌ Invalid API URL")
             return
         }
 
-        // Build multipart form data request
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+
+        // Add auth header
+        for (key, value) in authHeaders() {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
 
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -126,7 +145,6 @@ class CHARLIAPIClient: ObservableObject {
 
         // Close the multipart body
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-
         request.httpBody = body
 
         // Send the request
@@ -139,9 +157,20 @@ class CHARLIAPIClient: ObservableObject {
             guard let httpResponse = response as? HTTPURLResponse else { return }
 
             if httpResponse.statusCode == 200, let audioData = data {
-                // Success — play the audio response through glasses speakers
+                // Extract metadata from response headers
+                let transcription = httpResponse.value(forHTTPHeaderField: "X-Transcription")?
+                    .removingPercentEncoding ?? ""
+                let answer = httpResponse.value(forHTTPHeaderField: "X-Answer")?
+                    .removingPercentEncoding ?? ""
+
                 print("✅ Got audio response (\(audioData.count) bytes)")
+                print("💬 Heard: \(transcription)")
+                print("🤖 CHARLI: \(answer)")
+
                 DispatchQueue.main.async {
+                    self?.lastQuestion = transcription
+                    self?.lastResponse = answer
+
                     // Post notification for AudioManager to play
                     NotificationCenter.default.post(
                         name: .responseAudioReady,
@@ -155,8 +184,10 @@ class CHARLIAPIClient: ObservableObject {
         }.resume()
     }
 
-    // ── Text Query (for testing) ────────────────────────────────
-    // Send a text question directly (bypasses audio recording).
+    // ── Text Query ─────────────────────────────────────────────
+    // Send a text question (no audio). Returns text response.
+    // Endpoint: POST /api/ask
+
     func sendTextQuery(question: String) async {
         guard let url = URL(string: "\(baseURL)/api/ask") else { return }
 
@@ -164,7 +195,12 @@ class CHARLIAPIClient: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body = ["question": question, "language": "en"]
+        // Add auth header
+        for (key, value) in authHeaders() {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        let body: [String: Any] = ["question": question, "language": "en"]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         do {
@@ -180,6 +216,67 @@ class CHARLIAPIClient: ObservableObject {
             print("❌ Text query error: \(error)")
         }
     }
+
+    // ── Vision Query (Text + Image) ─────────────────────────────
+    // Send a text question with a base64 image. Returns text response.
+    // Endpoint: POST /api/ask/vision
+    //
+    // Use this when you have the image already as Data (e.g., from camera)
+    // and want just the text answer (no audio).
+
+    func sendVisionQuery(question: String, imageData: Data, imageMime: String = "image/jpeg") async {
+        guard let url = URL(string: "\(baseURL)/api/ask/vision") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        for (key, value) in authHeaders() {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        let imageBase64 = imageData.base64EncodedString()
+        let body: [String: Any] = [
+            "question": question,
+            "language": "en",
+            "imageBase64": imageBase64,
+            "imageMime": imageMime,
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, _) = try await session.data(for: request)
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let answer = json["answer"] as? String {
+                DispatchQueue.main.async {
+                    self.lastQuestion = question
+                    self.lastResponse = answer
+                }
+            }
+        } catch {
+            print("❌ Vision query error: \(error)")
+        }
+    }
+
+    // ── Conversation Management ─────────────────────────────────
+
+    func clearConversation() async {
+        guard let url = URL(string: "\(baseURL)/api/conversation") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        for (key, value) in authHeaders() {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        do {
+            let _ = try await session.data(for: request)
+            print("✅ Conversation cleared")
+        } catch {
+            print("❌ Clear conversation error: \(error)")
+        }
+    }
 }
 
 // ── Notification for response audio ─────────────────────────────────
@@ -188,10 +285,6 @@ extension Notification.Name {
 }
 
 // ── Multipart Form Data Helper ──────────────────────────────────────
-// Builds multipart/form-data body for file uploads.
-// This is the Swift equivalent of FormData in JavaScript:
-//   const form = new FormData();
-//   form.append('audio', audioBlob, 'recording.wav');
 extension Data {
     mutating func appendMultipart(
         boundary: String,

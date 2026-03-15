@@ -1,12 +1,20 @@
-soundfile
-numpy
-faster-whisper
-openai
-fastapi
-uvicorn[standard]
-websockets
-pvporcupine
-pvrecorder
-psutil
-textual
-websocket-client
+# ── Hardware I/O (stays on the Pi) ──────────────────────────
+soundfile          # Read/write WAV files
+numpy              # Audio processing
+pvporcupine        # Wake word detection
+pvrecorder         # Picovoice audio recorder
+
+# ── Web UI + Server ─────────────────────────────────────────
+fastapi            # Web framework for JARVIS UI
+uvicorn[standard]  # ASGI server
+websockets         # WebSocket library
+requests           # HTTP client for CHARLI Server
+
+# ── System ──────────────────────────────────────────────────
+psutil             # System metrics
+textual            # TUI framework
+websocket-client   # WebSocket client for Mac Link
+
+# ── Optional (only if running local pipeline as fallback) ───
+# faster-whisper   # Only needed if transcribing locally
+# openai           # Only needed if calling OpenClaw directly
