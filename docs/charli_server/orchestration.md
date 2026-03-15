@@ -34,8 +34,14 @@ Verify: `curl http://localhost:3001/health`
 cd charli_server
 npm install                      # First time only
 cp .env.example .env             # First time only — fill in OPENCLAW_TOKEN
-npx prisma migrate dev           # First time only
-npx prisma db seed               # First time only — prints API keys!
+
+# Prisma 7 setup (first time only):
+#   1. Generate client (outputs to prisma/generated/)
+#   2. Push schema to create SQLite DB (at prisma/charli.db)
+#   3. Seed default devices (save the API keys it prints!)
+npx prisma generate
+npx prisma db push
+npx ts-node prisma/seed.ts
 
 npm run start:dev
 # → CHARLI Server running on http://localhost:3000
@@ -128,6 +134,7 @@ module.exports = {
         CHARLI_SERVER_PORT: '3000',
         OPENCLAW_URL: 'http://localhost:18789',
         SIDECAR_URL: 'http://localhost:3001',
+        // IMPORTANT: path is relative to cwd (charli_server/)
         DATABASE_URL: 'file:./prisma/charli.db',
       },
     },
@@ -138,8 +145,10 @@ module.exports = {
 ### Running with PM2
 
 ```bash
-# Build NestJS first
-cd charli_server && npm run build
+# Build NestJS first (Prisma client must be generated before build)
+cd charli_server
+npx prisma generate
+npm run build
 
 # Start both processes
 pm2 start ecosystem.config.js
@@ -227,6 +236,7 @@ curl http://charli-server:3000/health
 curl http://localhost:3001/health
 
 # List devices and their lastSeen timestamps
+# NOTE: API keys are NOT included in the response (security)
 curl -H "X-API-Key: your-admin-key" http://charli-server:3000/api/devices
 ```
 
@@ -299,3 +309,9 @@ fi
 
 - Check the API key in the connection URL: `ws://server:3000/events?apiKey=chk_...`
 - Check CORS — the server allows all origins by default
+
+### Prisma errors after upgrading
+
+- Did you run `npx prisma generate`? The client must be regenerated after schema changes.
+- Check that `DATABASE_URL` in `.env` points to `file:./prisma/charli.db` (relative to project root).
+- There should be only ONE `charli.db` file, at `prisma/charli.db`. If you see one at the project root, delete it and re-run `npx prisma db push`.

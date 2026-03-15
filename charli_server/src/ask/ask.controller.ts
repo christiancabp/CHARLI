@@ -5,7 +5,7 @@ import { AskDto, AskVisionDto } from './dto/ask.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentDevice } from '../common/decorators/current-device.decorator';
 import { ConversationService } from '../conversation/conversation.service';
-import { Device } from '@prisma/client';
+import { Device } from '@prisma/generated';
 
 @ApiTags('Ask')
 @ApiSecurity('api-key')

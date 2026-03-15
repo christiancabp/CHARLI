@@ -59,10 +59,11 @@ The sidecar runs Whisper "base" (~200MB). On the Mac Mini, we can afford larger 
 
 SQLite works great for a single-server setup. Postgres adds concurrency and remote access.
 
-**What to change:**
+**What to change (Prisma 7):**
 - `prisma/schema.prisma`: change `provider = "sqlite"` to `provider = "postgresql"`
-- Update `DATABASE_URL` to a Postgres connection string
-- Run `npx prisma migrate dev`
+- Replace `@prisma/adapter-better-sqlite3` with `@prisma/adapter-pg` in `prisma.service.ts` and `prisma/seed.ts`
+- Update `DATABASE_URL` in `.env` to a Postgres connection string
+- Run `npx prisma db push` (or `npx prisma migrate dev` for production migrations)
 
 **Impact:** Better concurrent writes, full-text search, easier backups, remote DB access.
 

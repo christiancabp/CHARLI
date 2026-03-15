@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Device } from '@prisma/client';
+import { Device } from '@prisma/generated';
 import {
   DEFAULT_PROMPTS,
   VISION_PROMPT,

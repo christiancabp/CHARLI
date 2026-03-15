@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Device } from '@prisma/client';
+import { Device } from '@prisma/generated';
 import { TranscribeService } from '../transcribe/transcribe.service';
 import { AskService } from '../ask/ask.service';
 import { TtsService } from '../tts/tts.service';

@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiSecurity } from '@nestjs/swagger
 import { ConversationService } from './conversation.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentDevice } from '../common/decorators/current-device.decorator';
-import { Device } from '@prisma/client';
+import { Device } from '@prisma/generated';
 
 @ApiTags('Conversation')
 @ApiSecurity('api-key')

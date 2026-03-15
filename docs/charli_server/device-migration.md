@@ -6,7 +6,7 @@ How to point existing CHARLI devices to the new central server.
 
 1. CHARLI Server running on Mac Mini (`npm run start:dev` in `charli_server/`)
 2. Python sidecar running (`python3 sidecar.py` in `charli_server/sidecar/`)
-3. Devices registered and API keys generated (`npm run db:seed`)
+3. Devices registered and API keys generated (`npx ts-node prisma/seed.ts`)
 
 ## Pi Desk Hub (charli-home)
 
@@ -16,14 +16,14 @@ The Pi is now a **thin client**. It keeps:
 - Wake word detection (Porcupine)
 - Audio recording (USB mic)
 - Audio playback (Bluetooth speaker)
-- JARVIS web UI (touchscreen)
+- JARVIS web UI (touchscreen — connects to server via Socket.IO)
 - System monitoring (CPU, RAM)
 - Mac Link (WebSocket to Mac)
 
 It no longer runs locally:
-- ~~faster-whisper~~ (STT now on server)
-- ~~OpenAI client~~ (LLM queries now on server)
-- ~~espeak-ng for pipeline~~ (TTS now on server — local espeak kept only for push-to-speak)
+- ~~faster-whisper~~ (STT now on server via sidecar)
+- ~~OpenAI client~~ (LLM queries now on server via OpenClaw)
+- ~~espeak-ng for pipeline~~ (TTS now on server — local espeak kept only for push-to-speak fallback)
 
 ### Setup
 
@@ -43,12 +43,12 @@ export CHARLI_KEYWORD_PATH="/path/to/hey-charli.ppn"
 # export CHARLI_TOKEN=...
 ```
 
-2. **Update requirements** (optional — lighter install):
+2. **Update requirements** (lighter install):
 
 ```bash
 cd ~/charli-home
 source .venv/bin/activate
-pip install -r requirements.txt  # faster-whisper and openai are now optional
+pip install -r requirements.txt  # faster-whisper and openai removed from deps
 ```
 
 3. **Test the connection**:
@@ -74,6 +74,10 @@ After:  wake word → record → POST /api/pipeline/voice → play returned audi
 
 The server returns a WAV file. The Pi just plays it through the speaker.
 
+### JARVIS Web UI
+
+The JARVIS UI (`web/static/`) now uses Socket.IO to connect directly to `charli_server:3000/events` for real-time state and conversation updates. The Pi serves the static HTML files using Python's built-in `http.server` (no more FastAPI dependency).
+
 ### Image Support (Future)
 
 The Pi can send images alongside audio for vision queries. If you attach a camera:
@@ -91,7 +95,7 @@ The server handles vision detection and routing automatically.
 
 ### What Changed
 
-The iOS app's `CHARLIAPIClient.swift` now points to the central server instead of the glasses-specific Python API. The glasses Python API server (`charli_glasses/api/`) is **no longer needed**.
+The iOS app's `CHARLIAPIClient.swift` now points to the central server instead of the glasses-specific Python API. The glasses Python API server (`charli_glasses/api/`) has been **removed** — it's no longer needed.
 
 ### Endpoint Mapping
 
@@ -111,10 +115,10 @@ The iOS app's `CHARLIAPIClient.swift` now points to the central server instead o
    - `charli_server_url` = `http://charli-server:3000` (Mac Mini Tailscale address)
    - `charli_api_key` = `chk_your_glasses_key_here` (from server seed output)
 
-2. **Stop the old glasses API server** — it's no longer needed:
+2. The old glasses API server is gone:
    ```bash
-   # No longer run this:
-   # cd charli_glasses/api && python3 server.py
+   # charli_glasses/api/ has been removed entirely.
+   # All backend logic now lives in charli_server/.
    ```
 
 ### New Capabilities

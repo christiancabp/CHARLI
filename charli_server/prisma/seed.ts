@@ -1,15 +1,31 @@
 /**
  * CHARLI Server — Database Seed Script
  *
- * Creates the default devices (desk hub + glasses) with API keys.
- * Run with: npm run db:seed
+ * Creates the default devices (desk hub + smart glasses) with API keys.
+ * Run with: npx ts-node prisma/seed.ts
+ *
+ * This uses upsert, so it's safe to run multiple times — existing devices
+ * won't be duplicated (matched by unique `name` field).
+ *
+ * IMPORTANT: Save the API keys printed to the console! They're needed
+ * to configure each device's CHARLI_API_KEY env var. The keys are only
+ * visible here and on POST /api/devices — GET /api/devices hides them.
  */
 
-import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
+import { PrismaClient } from './generated/prisma/client/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { v4 as uuid } from 'uuid';
 
-const prisma = new PrismaClient();
+// Same adapter setup as prisma.service.ts — must point to the same DB.
+const adapter = new PrismaBetterSqlite3({
+  url: process.env.DATABASE_URL || 'file:./prisma/charli.db',
+});
+const prisma = new PrismaClient({ adapter });
 
+// Default system prompts per device type.
+// These match the prompts in src/ask/prompts/system-prompts.ts.
+// {lang_name} is replaced at runtime with "English", "Spanish", etc.
 const DESK_HUB_PROMPT = `You are CHARLI, a helpful voice assistant on a desk hub with a touchscreen.
 Keep answers SHORT: 1 to 3 sentences maximum.
 No bullet points, no numbered lists, no markdown symbols like * or #.
@@ -26,7 +42,8 @@ Respond in {lang_name}.`;
 async function main() {
   console.log('Seeding CHARLI database...');
 
-  // Create desk hub device
+  // Device name: "charli-home" (kebab-case, matches naming convention)
+  // Device type: "desk-hub" (kebab-case, matches system-prompts.ts keys)
   const deskHub = await prisma.device.upsert({
     where: { name: 'charli-home' },
     update: {},
@@ -40,7 +57,8 @@ async function main() {
   });
   console.log(`  Desk hub: ${deskHub.name} (key: ${deskHub.apiKey})`);
 
-  // Create glasses device
+  // Device name: "charli-glasses" (kebab-case)
+  // Device type: "smart-glasses" (kebab-case, NOT "glasses")
   const glasses = await prisma.device.upsert({
     where: { name: 'charli-glasses' },
     update: {},

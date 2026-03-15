@@ -12,7 +12,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiSecurity, ApiConsumes, ApiBody }
 import { PipelineService } from './pipeline.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentDevice } from '../common/decorators/current-device.decorator';
-import { Device } from '@prisma/client';
+import { Device } from '@prisma/generated';
 
 @ApiTags('Pipeline')
 @ApiSecurity('api-key')

@@ -3,6 +3,7 @@ dist/
 .env
 prisma/charli.db
 prisma/charli.db-journal
+prisma/generated/
 sidecar/.venv/
 sidecar/__pycache__/
 *.js.map

@@ -25,9 +25,14 @@ Devices are thin clients — they capture input and play output. The server hand
 cd charli_server
 cp .env.example .env       # Edit with your OpenClaw token
 npm install
-npx prisma migrate dev     # Create/update database
-npx prisma db seed         # Create default devices (prints API keys!)
-npm run start:dev          # → http://localhost:3000
+
+# Prisma 7 uses a driver adapter (better-sqlite3) instead of the Rust engine.
+# The DB connection is configured in prisma.config.ts and .env, NOT in schema.prisma.
+npx prisma generate         # Generate the Prisma client into prisma/generated/
+npx prisma db push          # Create/sync the SQLite database
+npx ts-node prisma/seed.ts  # Create default devices (prints API keys — save them!)
+
+npm run start:dev           # → http://localhost:3000
 ```
 
 ### 2. Python Sidecar
@@ -57,6 +62,9 @@ curl -X POST http://localhost:3000/api/pipeline/voice \
   -H "X-API-Key: chk_your_key_here" \
   -F "audio=@recording.wav" \
   -o response.wav
+
+# Interactive API docs
+open http://localhost:3000/docs
 ```
 
 ## Environment Variables
@@ -67,30 +75,50 @@ curl -X POST http://localhost:3000/api/pipeline/voice \
 | `OPENCLAW_TOKEN` | | Auth token from `~/.openclaw/openclaw.json` |
 | `SIDECAR_URL` | `http://localhost:3001` | Python sidecar URL |
 | `CHARLI_SERVER_PORT` | `3000` | NestJS server port |
-| `DATABASE_URL` | `file:./prisma/charli.db` | SQLite database path |
+| `DATABASE_URL` | `file:./prisma/charli.db` | SQLite database path (used by both prisma.config.ts and PrismaService) |
 | `ADMIN_API_KEY` | | Admin key for device registration |
+
+## Naming Conventions
+
+| Context | Convention | Examples |
+|---------|-----------|----------|
+| Directory / module names | `snake_case` | `charli_server`, `charli_home`, `charli_glasses` |
+| Device names (DB, API) | `kebab-case` | `charli-home`, `charli-glasses` |
+| Device types (DB, prompts) | `kebab-case` | `desk-hub`, `smart-glasses`, `phone` |
 
 ## Project Structure
 
 ```
 charli_server/
-├── prisma/              ← Database schema + migrations
-├── sidecar/             ← Python ML sidecar (STT + TTS)
-│   ├── sidecar.py       ← FastAPI: /transcribe + /tts
+├── prisma/                    ← Database schema + generated client
+│   ├── schema.prisma          ← Models only (no url — that's in prisma.config.ts)
+│   ├── generated/             ← Auto-generated Prisma client (gitignored)
+│   ├── seed.ts                ← Seed script for default devices
+│   └── charli.db              ← SQLite database (gitignored)
+├── prisma.config.ts           ← Prisma 7 CLI config (DB url, migrations, seed)
+├── sidecar/                   ← Python ML sidecar (STT + TTS)
+│   ├── sidecar.py             ← FastAPI: /transcribe + /tts
 │   └── requirements.txt
 ├── src/
-│   ├── main.ts          ← Bootstrap
-│   ├── app.module.ts    ← Root module
-│   ├── ask/             ← LLM queries (text + vision)
-│   ├── transcribe/      ← Speech-to-text (via sidecar)
-│   ├── tts/             ← Text-to-speech (via sidecar)
-│   ├── pipeline/        ← Full voice pipeline orchestrator
-│   ├── conversation/    ← Conversation history (Prisma)
-│   ├── device/          ← Device registry
-│   ├── auth/            ← API key guard
-│   ├── events/          ← WebSocket gateway
-│   ├── health/          ← Health check
-│   ├── prisma/          ← Prisma service
-│   └── common/          ← Shared decorators
+│   ├── main.ts                ← Bootstrap + Swagger setup
+│   ├── app.module.ts          ← Root module
+│   ├── ask/                   ← LLM queries (text + vision)
+│   │   └── prompts/           ← Default per-device system prompts
+│   ├── transcribe/            ← Speech-to-text (proxies to sidecar)
+│   ├── tts/                   ← Text-to-speech (proxies to sidecar)
+│   ├── pipeline/              ← Full voice pipeline orchestrator
+│   ├── conversation/          ← Conversation history (Prisma CRUD)
+│   ├── device/                ← Device registry (API keys NOT exposed on GET)
+│   ├── auth/                  ← API key guard + admin key support
+│   ├── events/                ← Socket.IO WebSocket gateway
+│   ├── health/                ← Health check (no auth)
+│   ├── prisma/                ← PrismaService (driver adapter setup)
+│   └── common/                ← Shared decorators (@CurrentDevice)
 └── .env.example
 ```
+
+## Key Design Decisions
+
+- **Prisma 7 driver adapter:** No Rust engine — uses `@prisma/adapter-better-sqlite3` directly. Connection URL lives in `.env` and is read by both `prisma.config.ts` (CLI) and `prisma.service.ts` (runtime).
+- **API keys not leaked:** `GET /api/devices` strips `apiKey` from responses. Keys are only shown once on `POST /api/devices` (creation).
+- **System prompts per device type:** Defaults in `src/ask/prompts/system-prompts.ts`, overridable per device via the DB `systemPrompt` field.

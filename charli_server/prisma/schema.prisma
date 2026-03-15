@@ -1,25 +1,38 @@
 // CHARLI Server — Database Schema
-// SQLite for now. One-line change to switch to Postgres later.
+//
+// Prisma 7: The `datasource` block only declares the provider.
+// The connection URL lives in prisma.config.ts (for CLI) and
+// src/prisma/prisma.service.ts (for runtime). Both read from DATABASE_URL.
+//
+// To switch to Postgres: change provider here, swap the driver adapter
+// in prisma.service.ts and seed.ts, and update DATABASE_URL.
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
+// Prisma 7: generator outputs to a local directory (not node_modules).
+// All source files import from '@prisma/generated' (tsconfig path alias
+// pointing to prisma/generated/prisma/client/client).
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "./generated/prisma/client"
 }
 
 // ── Devices ─────────────────────────────────────────────────────────
-// Each CHARLI device (desk hub, glasses, phone) gets a record here.
+// Each CHARLI device (desk hub, smart glasses, phone) gets a record here.
 // The API key authenticates requests. System prompt customizes behavior.
+//
+// Naming convention:
+//   name → kebab-case: "charli-home", "charli-glasses"
+//   type → kebab-case: "desk-hub", "smart-glasses", "phone"
 
 model Device {
   id           String   @id @default(uuid())
   name         String   @unique // "charli-home", "charli-glasses"
   type         String // "desk-hub", "smart-glasses", "phone"
-  apiKey       String   @unique // For auth — sent in X-API-Key header
-  systemPrompt String? // Custom prompt override per device
+  apiKey       String   @unique // For auth — sent in X-API-Key header. NEVER returned by GET /api/devices.
+  systemPrompt String? // Custom prompt override (falls back to DEFAULT_PROMPTS[type] if null)
   maxTokens    Int      @default(150)
   lastSeen     DateTime?
   createdAt    DateTime @default(now())
@@ -42,6 +55,7 @@ model Conversation {
 
 // ── Messages ────────────────────────────────────────────────────────
 // Individual messages within a conversation (user or assistant).
+// Cascade delete: clearing a conversation removes all its messages.
 
 model Message {
   id             String       @id @default(uuid())
