@@ -22,23 +22,24 @@ Extend CHARLI from a desk-bound assistant into a wearable companion. The Meta Ra
 
 ## Architecture
 
+> **Updated:** The dedicated glasses API server has been replaced by the central CHARLI Server. Both the desk hub and glasses now connect to the same NestJS backend.
+
 ```
 Meta Ray-Ban Glasses ──── Bluetooth ────→ iPhone Companion App
-   (eyes + ears + mouth)                  (relay station)
+   (eyes + ears + mouth)                  (thin client)
                                               │
                                      WiFi / Tailscale
                                               │
-                                    CHARLI Glasses API
-                                    (FastAPI server)
-                                              │
-                                    Mac Mini (OpenClaw)
-                                    (CHARLI's brain)
+                                    CHARLI Server (NestJS :3000)
+                                    ├── Auth, Pipeline, Conversation
+                                    ├── Python Sidecar (STT + TTS)
+                                    └── OpenClaw (LLM brain)
 ```
 
-This fits perfectly into CHARLI's existing "distributed nervous system" pattern:
-- The **desk hub** (Pi) = eyes + ears + mouth at the desk
-- The **glasses** = eyes + ears + mouth on the go
-- The **Mac Mini** = the brain (always)
+This fits perfectly into CHARLI's "distributed nervous system" pattern:
+- The **desk hub** (Pi) = ears + mouth + display at the desk
+- The **glasses** (iPhone) = eyes + ears + mouth on the go
+- The **CHARLI Server** (Mac Mini) = brain + memory (always)
 
 ## Three Approaches
 

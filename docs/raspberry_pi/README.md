@@ -49,6 +49,8 @@ Nooooww drumroll please...
 
 ---
 
+> **Note (2026-03):** CHARLI Home is now a thin client (v3.0). The Pi handles only hardware I/O — all backend processing (STT, LLM, TTS, conversation) runs on the central CHARLI Server on the Mac Mini. See `charli_home/README.md` and `docs/charli_server/` for current setup instructions.
+
 ## Raspberry Pi Cheat Sheet
 
 Quick reference for commands, tips, and tricks we pick up along the way.
