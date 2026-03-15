@@ -1,0 +1,53 @@
+// CHARLI Server — Database Schema
+// SQLite for now. One-line change to switch to Postgres later.
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ── Devices ─────────────────────────────────────────────────────────
+// Each CHARLI device (desk hub, glasses, phone) gets a record here.
+// The API key authenticates requests. System prompt customizes behavior.
+
+model Device {
+  id           String   @id @default(uuid())
+  name         String   @unique // "charli-home", "charli-glasses"
+  type         String // "desk-hub", "glasses", "phone"
+  apiKey       String   @unique // For auth — sent in X-API-Key header
+  systemPrompt String? // Custom prompt override per device
+  maxTokens    Int      @default(150)
+  lastSeen     DateTime?
+  createdAt    DateTime @default(now())
+
+  conversations Conversation[]
+}
+
+// ── Conversations ───────────────────────────────────────────────────
+// One active conversation per device. Stores context for follow-up questions.
+
+model Conversation {
+  id        String   @id @default(uuid())
+  deviceId  String
+  device    Device   @relation(fields: [deviceId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+}
+
+// ── Messages ────────────────────────────────────────────────────────
+// Individual messages within a conversation (user or assistant).
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // "user" | "assistant"
+  content        String
+  createdAt      DateTime     @default(now())
+}

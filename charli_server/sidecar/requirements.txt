@@ -1,0 +1,7 @@
+# CHARLI Sidecar — Python ML dependencies
+# Install: pip install -r requirements.txt
+
+faster-whisper>=1.0.0    # Speech-to-text (Whisper, runs on CPU)
+fastapi>=0.110.0         # HTTP server for sidecar endpoints
+uvicorn>=0.27.0          # ASGI server to run FastAPI
+python-multipart>=0.0.9  # File upload support for FastAPI

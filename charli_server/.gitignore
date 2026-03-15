@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+prisma/charli.db
+prisma/charli.db-journal
+sidecar/.venv/
+sidecar/__pycache__/
+*.js.map
