@@ -37,7 +37,7 @@ All devices are **thin clients**. They handle hardware (mic, speaker, screen, ca
 
 ```
                     ┌─────────────────────────────────────────────┐
-                    │             Mac Mini (the brain)             │
+                    │             Mac Mini (the brain)            │
                     │                                             │
  Pi Desk Hub ──────►│  CHARLI Server    Python Sidecar   OpenClaw │
  iPhone Glasses ───►│  (NestJS :3000)   (FastAPI :3001)  (:18789) │
@@ -73,16 +73,16 @@ A JARVIS-style assistant on a Raspberry Pi 5 with a 7" touchscreen.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ C.H.A.R.L.I.                                    ● 17:42:03      │
+│ C.H.A.R.L.I.                                       ● 17:42:03    │
 ├────────────────────────┬─────────────────────────────────────────┤
 │                        │ TRANSCRIPT                              │
 │     ╭────────────╮     │                                         │
 │    ╱  ┌────────┐  ╲    │ ┌─YOU──────────────────────────────┐    │
 │   │   │ ░░░░░░ │   │   │ │ What's the weather like today?   │    │
-│   │   │ ░ORB ░ │   │   │ └─────────────────────────────────┘    │
-│    ╲  └────────┘  ╱    │ ┌─CHARLI───────────────────────────┐   │
-│     ╰────────────╯     │ │ It's 72 degrees and sunny.       │   │
-│      [ SPEAKING ]      │ └───────────────────────────────────┘   │
+│   │   │ ░ORB ░ │   │   │ └──────────────────────────────────┘    │
+│    ╲  └────────┘  ╱    │ ┌─CHARLI───────────────────────────┐    │
+│     ╰────────────╯     │ │ It's 72 degrees and sunny.       │    │
+│      [ SPEAKING ]      │ └──────────────────────────────────┘    │
 ├────────────────────────┴─────────────────────────────────────────┤
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -108,7 +108,7 @@ Meta Ray-Ban Display smart glasses as a wearable CHARLI interface.
 | **Database** | Prisma 7 + SQLite | Device registry, conversation history |
 | **Speech-to-Text** | faster-whisper (Python sidecar) | Local, free, fast transcription |
 | **Text-to-Speech** | espeak-ng / Piper (Python sidecar) | Local, free voice synthesis |
-| **LLM** | OpenClaw gateway | Routes to Claude, GPT, local models |
+| **LLM** | OpenClaw gateway | Routes to Claude, Gemini, local models |
 | **Desk Hub** | Raspberry Pi 5 + Python | Wake word, mic, speaker, touchscreen |
 | **Glasses** | Swift / SwiftUI (iOS) | Bluetooth audio, camera capture |
 | **Real-time** | Socket.IO | Live state + message broadcasting |
