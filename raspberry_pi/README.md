@@ -28,7 +28,9 @@ Nooooww drumroll please...
 | Adafruit 135x240 Color Mini PiTFT | 2 | Small color display for projects |
 | Adafruit 128x64 OLED Bonnet | 1 | Small OLED display with joystick and 2 buttons |
 | Raspberry Pi Pico Breadboard Kit Plus w/ Capactive Touch Display | 2 | Microcontroller projects? |
-| Raspberry Pi Pico MicroPython Programing Sensor Kit | 1 | Microcontroller projects? |
+| Raspberry Pi Pico H | 1 | Microcontroller projects? |
+| Raspberry Pi Pico 2WH | 2 | Microcontroller projects? |
+| Raspberry Pi Pico MicroPython Programing Sensor Kit | 1 | Assortment of sensors, LEDs, buttons, potentiometers, servos, etc. |
 
 ## Accessories
 
