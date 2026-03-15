@@ -1,0 +1,9 @@
+node_modules/
+dist/
+prisma/charli.db
+prisma/charli.db-journal
+prisma/generated/
+sidecar/
+.env
+*.js.map
+.git/

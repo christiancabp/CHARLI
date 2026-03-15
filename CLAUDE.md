@@ -28,16 +28,25 @@ Future Devices ───┘         │                                         
 
 ### CHARLI Server (`charli_server/`)
 
-NestJS (TypeScript) with these modules:
-- `auth/` — API key guard (`X-API-Key` header)
+NestJS (TypeScript) with Prisma 7 + SQLite. Key details:
+
+- **Prisma 7:** No Rust engine. Uses `@prisma/adapter-better-sqlite3` driver adapter.
+  - `prisma.config.ts` — CLI config (migrations, db push). Reads `DATABASE_URL` from env.
+  - `src/prisma/prisma.service.ts` — Runtime adapter setup. Also reads `DATABASE_URL`.
+  - `prisma/generated/` — Auto-generated client (gitignored). Run `npx prisma generate` after schema changes.
+  - Import types with `from '@prisma/generated'` (tsconfig path alias).
+- **API keys:** `GET /api/devices` strips `apiKey` from responses. Keys only visible on `POST /api/devices` (creation).
+
+Modules:
+- `auth/` — API key guard (`X-API-Key` header) + admin key support
 - `device/` — Device registry (Prisma + SQLite)
-- `ask/` — LLM queries to OpenClaw (text + vision)
+- `ask/` — LLM queries to OpenClaw (text + vision), per-device system prompts
 - `transcribe/` — STT proxy to Python sidecar
 - `tts/` — TTS proxy to Python sidecar
 - `pipeline/` — Full voice orchestrator (transcribe → ask → tts)
 - `conversation/` — Conversation history per device
 - `events/` — Socket.IO WebSocket gateway for real-time state
-- `health/` — Health check
+- `health/` — Health check (no auth)
 
 Key endpoints:
 - `POST /api/pipeline/voice` — Audio in → audio out (full pipeline)
@@ -99,8 +108,12 @@ cd ~/charli-home && python3 charli_home.py              # → localhost:8080
 cd charli_server
 npm install
 cp .env.example .env         # Fill in OPENCLAW_TOKEN
-npx prisma migrate dev       # Create/update DB
-npx prisma db seed            # Seed devices (prints API keys)
+
+# Prisma 7 setup:
+npx prisma generate          # Generate client to prisma/generated/
+npx prisma db push           # Create/sync SQLite DB at prisma/charli.db
+npx ts-node prisma/seed.ts   # Seed devices (prints API keys — save them!)
+
 npm run start:dev             # Hot-reload dev server — Swagger at /docs
 ```
 
@@ -129,7 +142,7 @@ python3 charli_home/src/charli_server_client.py
 - `OPENCLAW_URL` — OpenClaw gateway (default: `http://localhost:18789`)
 - `OPENCLAW_TOKEN` — Auth token from `~/.openclaw/openclaw.json`
 - `SIDECAR_URL` — Python sidecar (default: `http://localhost:3001`)
-- `DATABASE_URL` — SQLite path (default: `file:./charli.db`)
+- `DATABASE_URL` — SQLite path (default: `file:./prisma/charli.db`). Read by both `prisma.config.ts` and `prisma.service.ts`.
 - `ADMIN_API_KEY` — Admin key for device registration
 
 #### Pi Desk Hub (`~/.bashrc`)
@@ -142,6 +155,14 @@ python3 charli_home/src/charli_server_client.py
 - `charli_server_url` — Central server URL
 - `charli_api_key` — API key for glasses device
 
+## Naming Conventions
+
+| Context | Convention | Examples |
+|---------|-----------|----------|
+| Directory / module names | `snake_case` | `charli_server`, `charli_home`, `charli_glasses` |
+| Device names (DB, API) | `kebab-case` | `charli-home`, `charli-glasses` |
+| Device types (DB, prompts) | `kebab-case` | `desk-hub`, `smart-glasses`, `phone` |
+
 ## Conventions
 
 - Devices are pure clients — no backend logic, no server code
@@ -151,14 +172,15 @@ python3 charli_home/src/charli_server_client.py
 - Responses from CHARLI are 1-3 sentences, no markdown, natural spoken style
 - Audio format: 16kHz mono WAV for recording, WAV for TTS responses
 - Auth: API key per device via `X-API-Key` header
-- Database: SQLite via Prisma (one-line change to Postgres later)
+- Database: SQLite via Prisma 7 driver adapter (swap adapter + provider for Postgres)
+- Code comments are educational — this is a father-daughter learning project
 
 ## Documentation
 
 Detailed docs live in `docs/charli_server/`:
 - `README.md` — Quick start guide
 - `api-reference.md` — Full endpoint documentation
-- `architecture.md` — System design and rationale
+- `architecture.md` — System design, Prisma 7 migration details, WebSocket design
 - `device-migration.md` — How to migrate devices to the central server
 - `orchestration.md` — How to run the full stack (dev + production)
 - `future-improvements.md` — Roadmap and upgrade paths

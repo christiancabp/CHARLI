@@ -1,0 +1,52 @@
+# CHARLI Server — Docker Compose
+#
+# Start everything:  docker compose up
+# Background mode:   docker compose up -d
+# View logs:         docker compose logs -f
+# Stop:             docker compose down
+
+services:
+  server:
+    build: .
+    container_name: charli-server
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      # Override these for Docker networking:
+      # - Sidecar is a sibling container, not localhost.
+      # - OpenClaw runs on the host machine, not inside Docker.
+      SIDECAR_URL: http://sidecar:3001
+      DATABASE_URL: file:./prisma/charli.db
+    volumes:
+      - db-data:/app/prisma    # Persist SQLite DB across restarts
+    depends_on:
+      sidecar:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  sidecar:
+    build: ./sidecar
+    container_name: charli-sidecar
+    ports:
+      - "3001:3001"
+    environment:
+      CHARLI_WHISPER_MODEL: base
+      CHARLI_SIDECAR_PORT: "3001"
+    volumes:
+      - whisper-cache:/root/.cache    # Cache Whisper model (avoid re-downloading ~150MB)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s              # Whisper model takes ~3-5s to load
+
+volumes:
+  db-data:          # SQLite database persistence
+  whisper-cache:    # Whisper model cache

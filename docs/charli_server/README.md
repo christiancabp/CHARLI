@@ -19,6 +19,24 @@ Devices are thin clients — they capture input and play output. The server hand
 
 ## Quick Start
 
+### Option A: Docker Compose (Recommended)
+
+One command starts both the NestJS server and Python sidecar:
+
+```bash
+cd charli_server
+cp .env.example .env       # Edit with your OpenClaw token
+                           # Set OPENCLAW_URL=http://host.docker.internal:18789
+
+docker compose up
+# → charli-sidecar loads Whisper model...
+# → charli-server runs migrations, seeds DB, starts on :3000
+```
+
+The database is auto-created and seeded on first run. Save the API keys from the logs.
+
+### Option B: Bare-Metal
+
 ### 1. NestJS Server
 
 ```bash

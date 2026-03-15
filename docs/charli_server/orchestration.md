@@ -93,6 +93,72 @@ If OpenClaw isn't running, ask/pipeline endpoints will return a fallback error m
 
 ---
 
+## Docker Compose
+
+The simplest way to run both services — one command, visible in Docker Desktop.
+
+### Start
+
+```bash
+cd charli_server
+
+# Copy and edit your env file (first time only).
+# IMPORTANT: Set OPENCLAW_URL to http://host.docker.internal:18789
+# (not localhost — that would be inside the container).
+cp .env.example .env
+
+docker compose up          # foreground (see logs inline)
+docker compose up -d       # background (detached)
+```
+
+On first startup, the server container automatically:
+1. Runs `prisma db push` to create/sync the SQLite database
+2. Runs the seed script to create default devices (upsert — safe to re-run)
+3. Starts the NestJS server
+
+**Save the API keys** printed in the logs on first run — you need them for device config.
+
+### Useful Commands
+
+```bash
+docker compose logs -f              # Stream logs from both containers
+docker compose logs -f server       # Stream only NestJS logs
+docker compose logs -f sidecar      # Stream only sidecar logs
+docker compose down                 # Stop and remove containers
+docker compose down -v              # Stop + delete volumes (resets DB!)
+docker compose build --no-cache     # Rebuild images from scratch
+```
+
+### Re-seeding the Database
+
+The seed runs automatically on every startup (uses upsert, so it's safe). To manually re-seed:
+
+```bash
+docker compose exec server npx ts-node prisma/seed.ts
+```
+
+### Docker Desktop
+
+Both containers (`charli-server` and `charli-sidecar`) appear in Docker Desktop under the `charli_server` project. You can view logs, inspect resource usage, and stop/start containers from the GUI.
+
+### Networking Notes
+
+```
+Host Machine
+  ├── OpenClaw (:18789)     ← runs outside Docker
+  │
+  └── Docker Network
+       ├── server (:3000)   → talks to sidecar via http://sidecar:3001
+       │                    → talks to OpenClaw via host.docker.internal:18789
+       └── sidecar (:3001)  → standalone, no outbound connections
+```
+
+- Inside Docker, containers talk to each other by service name (`sidecar`, not `localhost`).
+- To reach OpenClaw on the host, use `host.docker.internal:18789`.
+- Both ports are exposed to the host for direct `curl` testing.
+
+---
+
 ## Production Setup (PM2)
 
 For persistent operation on the Mac Mini, use PM2 to manage both processes.
