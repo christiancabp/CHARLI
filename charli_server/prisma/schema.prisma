@@ -17,7 +17,7 @@ generator client {
 model Device {
   id           String   @id @default(uuid())
   name         String   @unique // "charli-home", "charli-glasses"
-  type         String // "desk-hub", "glasses", "phone"
+  type         String // "desk-hub", "smart-glasses", "phone"
   apiKey       String   @unique // For auth — sent in X-API-Key header
   systemPrompt String? // Custom prompt override per device
   maxTokens    Int      @default(150)

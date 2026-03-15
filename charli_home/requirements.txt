@@ -1,20 +1,15 @@
-# ── Hardware I/O (stays on the Pi) ──────────────────────────
+# CHARLI Home — Thin Client Dependencies
+# The Pi only handles hardware I/O. All backend logic is on charli_server.
+
+# ── Hardware I/O ────────────────────────────────────────────
 soundfile          # Read/write WAV files
-numpy              # Audio processing
-pvporcupine        # Wake word detection
+numpy              # Audio processing (normalize, boost)
+pvporcupine        # Wake word detection ("Hey Charli")
 pvrecorder         # Picovoice audio recorder
 
-# ── Web UI + Server ─────────────────────────────────────────
-fastapi            # Web framework for JARVIS UI
-uvicorn[standard]  # ASGI server
-websockets         # WebSocket library
-requests           # HTTP client for CHARLI Server
+# ── Server Communication ────────────────────────────────────
+requests           # HTTP client for CHARLI Server API
 
 # ── System ──────────────────────────────────────────────────
-psutil             # System metrics
-textual            # TUI framework
+psutil             # System metrics (CPU, RAM, disk)
 websocket-client   # WebSocket client for Mac Link
-
-# ── Optional (only if running local pipeline as fallback) ───
-# faster-whisper   # Only needed if transcribing locally
-# openai           # Only needed if calling OpenClaw directly

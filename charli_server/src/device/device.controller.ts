@@ -42,7 +42,7 @@ export class DeviceController {
       type: 'object',
       properties: {
         name: { type: 'string', example: 'charli-phone', description: 'Unique device name' },
-        type: { type: 'string', example: 'phone', description: 'Device type (desk-hub, glasses, phone)' },
+        type: { type: 'string', example: 'phone', description: 'Device type (desk-hub, smart-glasses, phone)' },
         systemPrompt: { type: 'string', description: 'Custom system prompt (optional — uses default for device type if omitted)' },
         maxTokens: { type: 'number', example: 150, description: 'Max response tokens (default: 150)' },
       },

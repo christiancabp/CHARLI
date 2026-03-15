@@ -58,7 +58,7 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document, {
-    customSiteTitle: 'CHARLI Server — API Docs',
+    customSiteTitle: '🤖 CHARLI Server — API Docs',
     customfavIcon: undefined,
     swaggerOptions: {
       persistAuthorization: true,

@@ -46,7 +46,7 @@ async function main() {
     update: {},
     create: {
       name: 'charli-glasses',
-      type: 'glasses',
+      type: 'smart-glasses',
       apiKey: `chk_${uuid().replace(/-/g, '')}`,
       systemPrompt: GLASSES_PROMPT,
       maxTokens: 150,

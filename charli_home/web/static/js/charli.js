@@ -1,11 +1,24 @@
 /**
- * CHARLI Home — WebSocket Client & UI Logic
+ * CHARLI Home — WebSocket Client & UI Logic (Thin Client)
  *
- * Connects to the FastAPI WebSocket at /ws and keeps the JARVIS
- * touchscreen UI in sync with the assistant's state.
+ * Connects to the central CHARLI Server via Socket.IO for real-time
+ * state updates. The server broadcasts state changes and messages
+ * from ALL devices — we filter for our desk hub's events.
+ *
+ * The server URL and API key are configured below. On the Pi, these
+ * match the CHARLI_SERVER_URL and CHARLI_API_KEY env vars.
  */
 
 (() => {
+    // ── Configuration ─────────────────────────────────────────────
+    // The CHARLI Server URL. On the Pi, this is the Mac Mini's
+    // Tailscale address. For local dev, use localhost.
+    //
+    // To override: set window.CHARLI_SERVER_URL before this script loads,
+    // or edit this default value.
+    const SERVER_URL = window.CHARLI_SERVER_URL || 'http://charli-server:3000';
+    const API_KEY = window.CHARLI_API_KEY || '';
+
     // ── DOM elements ────────────────────────────────────────────────
     const transcript    = document.getElementById('transcript');
     const stateLabel    = document.getElementById('stateLabel');
@@ -27,8 +40,7 @@
         speaking:  'SPEAKING',
     };
 
-    let ws = null;
-    let reconnectTimer = null;
+    let socket = null;
 
     // ── Clock ───────────────────────────────────────────────────────
     function updateClock() {
@@ -66,82 +78,75 @@
         while (transcript.children.length > 1) {
             transcript.removeChild(transcript.lastChild);
         }
-        messages.forEach(msg => addTranscriptEntry(msg.role, msg.text));
+        messages.forEach(msg => {
+            // Server uses "role" + "content", local uses "role" + "text"
+            const role = msg.role === 'assistant' ? 'charli' : msg.role;
+            const text = msg.content || msg.text;
+            if (text) addTranscriptEntry(role, text);
+        });
     }
 
     // ── State updates ───────────────────────────────────────────────
     function applyState(state) {
-        // Update label
         stateLabel.textContent = STATE_LABELS[state] || state.toUpperCase();
 
-        // Update label color
         const color = STATE_COLORS[state] || STATE_COLORS.idle;
         stateLabel.style.color = color;
         stateLabel.style.textShadow = `0 0 8px ${color}60`;
 
-        // Update body class for CSS overrides
         document.body.className = `state-${state}`;
-
-        // Tell the orb to transition
         Orb.setState(state);
     }
 
-    // ── WebSocket connection ────────────────────────────────────────
+    // ── Socket.IO connection to CHARLI Server ────────────────────────
     function connect() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const url = `${protocol}//${window.location.host}/ws`;
+        console.log(`Connecting to CHARLI Server: ${SERVER_URL}/events`);
 
-        ws = new WebSocket(url);
+        socket = io(`${SERVER_URL}/events`, {
+            auth: { apiKey: API_KEY },
+            query: { apiKey: API_KEY },
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 2000,
+            reconnectionAttempts: Infinity,
+        });
 
-        ws.onopen = () => {
-            console.log('WebSocket connected');
+        socket.on('connect', () => {
+            console.log('Connected to CHARLI Server');
             connectionDot.classList.add('connected');
-            if (reconnectTimer) {
-                clearTimeout(reconnectTimer);
-                reconnectTimer = null;
-            }
-        };
+        });
 
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-
-            switch (data.type) {
-                case 'snapshot':
-                    applyState(data.state);
-                    if (data.conversation && data.conversation.length > 0) {
-                        loadConversation(data.conversation);
-                    }
-                    break;
-
-                case 'state':
-                    applyState(data.state);
-                    break;
-
-                case 'message':
-                    addTranscriptEntry(data.role, data.text);
-                    break;
-            }
-        };
-
-        ws.onclose = () => {
-            console.log('WebSocket disconnected');
+        socket.on('disconnect', () => {
+            console.log('Disconnected from CHARLI Server');
             connectionDot.classList.remove('connected');
-            scheduleReconnect();
-        };
+        });
 
-        ws.onerror = (err) => {
-            console.error('WebSocket error:', err);
-            ws.close();
-        };
-    }
+        // ── Server Events ────────────────────────────────────────
 
-    function scheduleReconnect() {
-        if (!reconnectTimer) {
-            reconnectTimer = setTimeout(() => {
-                reconnectTimer = null;
-                connect();
-            }, 2000);
-        }
+        // Snapshot: full state + conversation on first connect
+        socket.on('snapshot', (data) => {
+            applyState(data.state);
+            if (data.conversation && data.conversation.length > 0) {
+                loadConversation(data.conversation);
+            }
+        });
+
+        // Device state change (from any device)
+        socket.on('device:state', (data) => {
+            applyState(data.state);
+        });
+
+        // New message (from any device)
+        socket.on('device:message', (data) => {
+            const role = data.role === 'assistant' ? 'charli' : data.role;
+            addTranscriptEntry(role, data.content);
+        });
+
+        // Speak command from server (e.g., another device pushing audio)
+        socket.on('command:speak', (data) => {
+            console.log('Speak command:', data.text);
+            // The Pi handles this in charli_home.py, not the UI
+        });
     }
 
     // ── Initialize ──────────────────────────────────────────────────

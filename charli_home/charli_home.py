@@ -1,41 +1,40 @@
 #!/usr/bin/env python3
 """
-CHARLI Home — Version 3.0 (Desk Hub → Thin Client)
+CHARLI Home — Version 3.0 (Thin Client)
 
-This is the MAIN entry point — the "conductor" of the orchestra.
+The desk hub is now a pure client. No backend, no API server.
+It does three things: listen, send, play.
 
-It starts 4 things running AT THE SAME TIME (concurrently):
-  1. Wake word listener  → Porcupine listens for "Hey Charli"
-  2. Voice pipeline      → record → send to CHARLI Server → play response
-  3. Web server          → FastAPI serves the JARVIS UI on port 8080
-  4. System monitor      → Reads CPU temp, RAM every 10 seconds
-  5. Mac Link            → Persistent WebSocket to Mac Mini
+Concurrent subsystems via asyncio.gather():
+  1. Voice Pipeline  → wake word → record → POST to server → play audio
+  2. UI Server       → minimal static file server for JARVIS touchscreen
+  3. System Monitor  → CPU temp, RAM (broadcast via server WebSocket)
+  4. Mac Link        → persistent WebSocket to Mac Mini
 
-What changed in v3.0 (Thin Client):
-  Before: record → transcribe (local Whisper) → ask (OpenClaw) → speak (local espeak)
-  After:  record → POST to CHARLI Server → play returned audio
+What lives HERE (hardware I/O):
+  - Wake word detection (Porcupine, USB mic)
+  - Audio recording (arecord, USB mic)
+  - Audio playback (aplay/afplay, Bluetooth speaker)
+  - JARVIS UI static files (served to Chromium kiosk)
 
-  The Pi is now ears (mic), mouth (speaker), and face (touchscreen).
-  All processing (STT, LLM, TTS) happens on the Mac Mini via charli_server.
+What lives on the SERVER (charli_server on Mac Mini):
+  - Speech-to-text (faster-whisper via sidecar)
+  - LLM queries (OpenClaw)
+  - Text-to-speech (espeak-ng/Piper via sidecar)
+  - Conversation history (Prisma/SQLite)
+  - Device auth, WebSocket gateway, REST API
 
-Python Concept — asyncio:
-  asyncio is like JavaScript's event loop + async/await. We use
-  run_in_executor() to run blocking functions in background threads
-  so the main event loop stays responsive.
-
-No GPIO or sudo needed — uses USB mic, Bluetooth speaker,
-and a 7" touchscreen running Chromium in kiosk mode.
+No GPIO or sudo needed.
 """
 
-# ── Standard Library Imports ──────────────────────────────────────────
 import asyncio
 import os
 import signal
 import subprocess
 import sys
-
-# ── Third-Party Imports ───────────────────────────────────────────────
-import uvicorn
+import threading
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from functools import partial
 
 # ── Our Building Blocks ──────────────────────────────────────────────
 from src.state_manager import StateManager, State
@@ -43,36 +42,24 @@ from src.wake_word import WakeWordDetector
 from src.record import record_audio
 from src.system_monitor import monitor_loop
 from src.mac_link import MacLink
-
-# ── CHARLI Server Client ────────────────────────────────────────────
-# This replaces local transcribe, ask_charli, and speak modules.
-# All heavy processing now happens on the Mac Mini via the server.
 from src.charli_server_client import (
     voice_pipeline as server_voice_pipeline,
-    ask_charli as server_ask_charli,
-    speak_text as server_speak_text,
     check_health as server_check_health,
 )
 
-# ── Web Server ────────────────────────────────────────────────────────
-from web.server import app as web_app
-import web.server as web_server
-
 # ── Settings ─────────────────────────────────────────────────────────
-WEB_HOST = "0.0.0.0"
-WEB_PORT = 8080
+UI_PORT = 8080
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "static")
 
 
 # =====================================================================
-# LOCAL AUDIO PLAYBACK
+# AUDIO PLAYBACK
 # =====================================================================
 
 def play_audio(audio_path: str):
     """
     Play a WAV file through the default audio output (Bluetooth speaker).
-
-    On Linux (Pi): uses aplay
-    On macOS: uses afplay (for development/testing)
+    Cleans up the temp file after playback.
     """
     if not audio_path or not os.path.exists(audio_path):
         return
@@ -85,7 +72,6 @@ def play_audio(audio_path: str):
     except Exception as e:
         print(f"❌ Audio playback error: {e}")
     finally:
-        # Clean up the temp response file
         try:
             os.unlink(audio_path)
         except OSError:
@@ -95,12 +81,15 @@ def play_audio(audio_path: str):
 def speak_local(text: str, language: str = "en"):
     """
     Local TTS fallback — speak directly via espeak-ng on the Pi.
-    Used when the server is unreachable or for push-to-speak from Mac.
+    Used when Mac pushes a "speak this" command and we don't want
+    a server round-trip for something that should be instant.
     """
     voice_map = {"en": "en", "es": "es"}
     voice = voice_map.get(language, "en")
     try:
         subprocess.run(["espeak-ng", "-v", voice, text], check=True, capture_output=True)
+    except FileNotFoundError:
+        print("⚠️ espeak-ng not installed — cannot speak locally")
     except Exception as e:
         print(f"❌ Local TTS error: {e}")
 
@@ -111,79 +100,64 @@ def speak_local(text: str, language: str = "en"):
 
 async def voice_pipeline(state: StateManager):
     """
-    The heart of CHARLI — an infinite loop that:
-      1. Waits for "Hey Charli" (wake word)
-      2. Records your voice (5 seconds)
-      3. Sends audio to CHARLI Server (which does transcribe → ask → TTS)
-      4. Plays back the audio response
-      5. Goes back to step 1
+    Listen → Record → Send to server → Play response. Repeat forever.
 
-    State Machine:
-      IDLE → LISTENING → THINKING → SPEAKING → IDLE → ...
+    State machine: IDLE → LISTENING → THINKING → SPEAKING → IDLE
 
-    The server handles STT, LLM, and TTS. The Pi just records and plays.
+    The server returns a WAV file containing CHARLI's spoken answer.
+    We just play it through the speaker.
     """
     loop = asyncio.get_event_loop()
     detector = WakeWordDetector()
 
-    # Check if server is reachable at startup
     if not server_check_health():
-        print("⚠️ CHARLI Server is not reachable. Voice pipeline will retry on each wake word.")
+        print("⚠️ CHARLI Server is not reachable. Will retry on each wake word.")
 
     try:
         while True:
-            # ── STEP 1: Wait for wake word ────────────────────────
+            # ── Wait for wake word ────────────────────────────
             await state.set_state(State.IDLE)
-
-            detected = await loop.run_in_executor(
-                None, detector.wait_for_wakeword
-            )
-
+            detected = await loop.run_in_executor(None, detector.wait_for_wakeword)
             if not detected:
                 continue
 
-            # ── STEP 2: Record audio ──────────────────────────────
+            # ── Record audio ──────────────────────────────────
             await state.set_state(State.LISTENING)
             audio_file = await loop.run_in_executor(None, record_audio)
-
             if not audio_file:
                 continue
 
-            # ── STEP 3: Send to CHARLI Server ─────────────────────
-            # The server transcribes, asks the LLM, and generates TTS.
-            # We get back a WAV file to play.
+            # ── Send to server (transcribe → ask → TTS) ──────
             await state.set_state(State.THINKING)
 
-            # Optional: capture an image from a Pi camera if attached
-            # image_path = capture_image()  # Future: Pi camera support
+            # Future: capture Pi camera image for vision queries
+            # image_path = capture_image()
             image_path = None
 
             response_audio, transcription, answer, language = await loop.run_in_executor(
                 None, server_voice_pipeline, audio_file, image_path
             )
 
-            # Update conversation history in state manager (for the web UI)
+            # Update local state for the JARVIS UI
             if transcription:
                 state.add_message_sync("user", transcription)
             if answer:
                 state.add_message_sync("charli", answer)
 
-            # Clean up the input recording
+            # Clean up input recording
             try:
                 os.unlink(audio_file)
             except OSError:
                 pass
 
-            # ── STEP 4: Play the response ─────────────────────────
+            # ── Play the response ─────────────────────────────
             if response_audio:
                 await state.set_state(State.SPEAKING)
                 await loop.run_in_executor(None, play_audio, response_audio)
             elif answer:
-                # Server returned text but no audio — speak locally as fallback
+                # Fallback: speak locally if server returned text but no audio
                 await state.set_state(State.SPEAKING)
                 await loop.run_in_executor(None, speak_local, answer, language)
-
-            # Loop back to STEP 1 (IDLE) automatically
 
     except asyncio.CancelledError:
         pass
@@ -192,26 +166,38 @@ async def voice_pipeline(state: StateManager):
 
 
 # =====================================================================
-# WEB SERVER — Serves the JARVIS UI
+# UI SERVER — Minimal static file server for the touchscreen
 # =====================================================================
+# No FastAPI, no REST API, no WebSocket. Just file serving.
+# The JARVIS UI's JavaScript connects directly to charli_server's
+# WebSocket for real-time state updates.
 
-async def run_web_server(state: StateManager):
-    """Start the FastAPI/uvicorn web server as an async task."""
+class QuietHandler(SimpleHTTPRequestHandler):
+    """Static file handler that doesn't spam the terminal with logs."""
+    def log_message(self, format, *args):
+        pass  # Silence request logging
 
-    # Inject shared state + functions into the web server module
-    web_server.state_manager = state
-    web_server.speak_fn = speak_local           # Local TTS for push-to-speak
-    web_server.ask_fn = server_ask_charli       # Ask via CHARLI Server
-    web_server.speak_text_fn = server_speak_text  # TTS via server (returns audio file)
+async def run_ui_server():
+    """
+    Serve the JARVIS UI static files on port 8080.
 
-    config = uvicorn.Config(
-        web_app,
-        host=WEB_HOST,
-        port=WEB_PORT,
-        log_level="warning",
-    )
-    server = uvicorn.Server(config)
-    await server.serve()
+    Chromium kiosk on the Pi opens http://localhost:8080 and loads
+    the HTML/CSS/JS. The JavaScript in charli.js connects to
+    charli_server's WebSocket for live state updates.
+    """
+    handler = partial(QuietHandler, directory=STATIC_DIR)
+    server = HTTPServer(("0.0.0.0", UI_PORT), handler)
+
+    # Run in a background thread so it doesn't block the event loop
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    # Keep this coroutine alive (so asyncio.gather doesn't exit)
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except asyncio.CancelledError:
+        server.shutdown()
 
 
 # =====================================================================
@@ -219,34 +205,27 @@ async def run_web_server(state: StateManager):
 # =====================================================================
 
 async def main():
-    """
-    Launch all subsystems concurrently using asyncio.gather().
-    All tasks run at the same time. If any one crashes, the others keep running.
-    """
     state = StateManager()
     state._loop = asyncio.get_event_loop()
     state.system_metrics = {}
 
-    # Pi↔Mac persistent WebSocket connection
     mac_link = MacLink(state)
-    mac_link._speak_fn = speak_local  # Local TTS for Mac push commands
+    mac_link._speak_fn = speak_local
+
+    server_url = os.environ.get("CHARLI_SERVER_URL", "http://charli-server:3000")
 
     print(f"CHARLI Home v3.0 — Desk Hub (Thin Client)")
-    print(f"Web UI: http://localhost:{WEB_PORT}")
-    print(f"Server: {os.environ.get('CHARLI_SERVER_URL', 'http://charli-server:3000')}")
-    print(f"Waiting for wake word... (Ctrl+C to quit)")
+    print(f"JARVIS UI: http://localhost:{UI_PORT}")
+    print(f"Server:    {server_url}")
+    print(f"Waiting for wake word... (Ctrl+C to quit)\n")
 
     await asyncio.gather(
-        run_web_server(state),
-        voice_pipeline(state),
-        monitor_loop(state),
-        mac_link.run(),
+        voice_pipeline(state),      # Wake word → record → server → play
+        run_ui_server(),            # Static files for JARVIS touchscreen
+        monitor_loop(state),        # CPU temp, RAM, Tailscale
+        mac_link.run(),             # Persistent WS to Mac Mini
     )
 
-
-# =====================================================================
-# ENTRY POINT
-# =====================================================================
 
 if __name__ == "__main__":
     def handle_sigint(sig, frame):

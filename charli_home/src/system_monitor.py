@@ -159,53 +159,24 @@ def collect_metrics() -> dict:
 
 async def monitor_loop(state_manager):
     """
-    Async loop that collects and broadcasts system metrics every 10 seconds.
+    Async loop that collects system metrics every 10 seconds.
 
-    This runs as one of the concurrent tasks in asyncio.gather():
-      await asyncio.gather(
-          run_web_server(state),
-          voice_pipeline(state),
-          monitor_loop(state),      ← this function
-          mac_link.run(),
-      )
-
-    It collects metrics in a background thread (because cpu_percent blocks),
-    stores them on state_manager for the REST API, and broadcasts them
-    to all connected WebSocket clients.
-
-    The web UI and TUI use these metrics to show a status bar like:
-      CPU: 42°C  |  RAM: 12%  |  NET: connected
+    Stores metrics on state_manager so mac_link can report them.
+    In the thin client, there are no local WebSocket clients to broadcast to —
+    the JARVIS UI gets its updates from charli_server directly.
     """
     loop = asyncio.get_event_loop()
 
     while True:
         try:
-            # collect_metrics() is BLOCKING (cpu_percent sleeps for 1 second).
-            # run_in_executor moves it to a thread so the event loop stays responsive.
             metrics = await loop.run_in_executor(None, collect_metrics)
-
-            # Store metrics on the state manager so the REST API endpoint
-            # GET /api/status can include them in its response.
             state_manager.system_metrics = metrics
 
-            # Broadcast to all connected WebSocket clients (browsers, TUI).
-            # They receive: {"type": "system", "metrics": {...}}
-            await state_manager._broadcast({
-                "type": "system",
-                "metrics": metrics,
-            })
-
         except asyncio.CancelledError:
-            # Graceful shutdown — stop the loop
             break
         except Exception as e:
-            # Don't crash the whole system if one metric read fails.
-            # Just log it and try again next interval.
             print(f"⚠️ System monitor error: {e}")
 
-        # Wait 10 seconds before collecting again.
-        # asyncio.sleep() is non-blocking — it lets other tasks run.
-        # This is like: await new Promise(resolve => setTimeout(resolve, 10000))
         await asyncio.sleep(BROADCAST_INTERVAL)
 
 

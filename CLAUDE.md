@@ -8,10 +8,10 @@ CHARLI (C.H.A.R.L.I.) is a personal AI assistant ecosystem with multiple devices
 
 ### Components
 
-1. **CHARLI Server** (`charli_server/`) — Central NestJS backend on Mac Mini. API gateway for all devices. Handles auth, LLM queries, conversation history, WebSockets.
+1. **CHARLI Server** (`charli_server/`) — Central NestJS backend on Mac Mini. THE brain. Handles auth, LLM queries, STT, TTS, conversation history, WebSockets. Swagger docs at `/docs`.
 2. **Python Sidecar** (`charli_server/sidecar/`) — FastAPI ML worker (faster-whisper STT + espeak-ng/Piper TTS). Runs alongside NestJS on Mac Mini.
-3. **Desk Hub** (`charli_home/`) — Raspberry Pi 5 thin client. Wake word detection, audio I/O, JARVIS touchscreen UI. Sends audio to server, plays responses.
-4. **Glasses** (`charli_glasses/`) — Meta Ray-Ban smart glasses via iOS companion app. Sends audio + camera images to server.
+3. **Desk Hub** (`charli_home/`) — Raspberry Pi 5 thin client. Hardware I/O only: wake word, mic, speaker, touchscreen UI. Zero backend logic.
+4. **Glasses** (`charli_glasses/ios/`) — iOS companion app for Meta Ray-Ban glasses. Pure client: records audio, sends to server, plays response.
 
 ## Architecture
 
@@ -22,7 +22,7 @@ Future Devices ───┘         │                                         
                         SQLite DB                                         faster-whisper + espeak-ng/Piper
 ```
 
-**Devices are thin clients** — they capture input (audio, images) and play output (audio). All processing lives on the Mac Mini.
+**Devices are thin clients** — they capture input (audio, images) and play output (audio). ALL processing lives on the Mac Mini. No server code runs on devices.
 
 **State machine** (same across all devices): `IDLE → LISTENING → THINKING → SPEAKING → IDLE`
 
@@ -45,37 +45,37 @@ Key endpoints:
 - `POST /api/ask/vision` — Text + image → text answer
 - `POST /api/transcribe` — Audio → text
 - `POST /api/tts` — Text → audio
+- Swagger: `GET /docs`
 
 ### Desk Hub (`charli_home/`)
 
-Five concurrent subsystems via `asyncio.gather()`:
-1. **Wake Word Listener** — Porcupine detects "Hey Charli" via USB mic
-2. **Voice Pipeline** — record → POST to server → play returned audio
-3. **Web Server** — FastAPI serves JARVIS UI on touchscreen (port 8080)
-4. **System Monitor** — CPU temp, RAM, Tailscale status
-5. **Mac Link** — Persistent WebSocket to Mac Mini
+Pure thin client. Four concurrent subsystems via `asyncio.gather()`:
+1. **Voice Pipeline** — wake word → record → POST to server → play returned audio
+2. **UI Server** — minimal `http.server` serving JARVIS static files (port 8080)
+3. **System Monitor** — CPU temp, RAM, Tailscale status
+4. **Mac Link** — Persistent WebSocket to Mac Mini
 
 Key files:
-- **`charli_home.py`** — Async orchestrator (v3.0 thin client)
-- **`src/charli_server_client.py`** — HTTP client for CHARLI Server (replaces local transcribe/ask/speak)
-- **`src/state_manager.py`** — State enum + WebSocket broadcast
+- **`charli_home.py`** — Async orchestrator (thin client, no FastAPI)
+- **`src/charli_server_client.py`** — HTTP client for CHARLI Server
+- **`src/state_manager.py`** — Local state tracking for pipeline coordination
 - **`src/wake_word.py`** — Porcupine wake word detection
 - **`src/record.py`** — USB mic recording via `arecord`
-- **`web/server.py`** — FastAPI web server + REST API
-- **`web/static/`** — JARVIS UI (HTML/CSS/JS, animated orb)
+- **`src/system_monitor.py`** — System metrics collector
+- **`src/mac_link.py`** — Pi↔Mac persistent WebSocket
+- **`web/static/`** — JARVIS UI (HTML/CSS/JS). Socket.IO connects to charli_server.
 
-Legacy files (still present, no longer used in main pipeline):
-- `src/transcribe.py` — Local Whisper (can be used as fallback)
-- `src/ask_charli.py` — Direct OpenClaw client (replaced by server)
-- `src/speak.py` — Local espeak-ng (kept for push-to-speak fallback)
+No backend code: no FastAPI, no REST API, no local transcription, no local LLM calls, no local TTS pipeline.
 
-### Glasses (`charli_glasses/`)
+### Glasses (`charli_glasses/ios/`)
 
-- **iOS app** (`ios/CHARLIGlasses/`) — Swift/SwiftUI companion app
-  - `CHARLIAPIClient.swift` — HTTP client pointing to CHARLI Server
-  - `AudioManager.swift` — Bluetooth audio, recording, playback
-  - `ContentView.swift` — UI with status orb
-- **API server** (`api/`) — **REPLACED** by charli_server (kept for reference)
+iOS companion app (Swift/SwiftUI):
+- `CHARLIAPIClient.swift` — HTTP client pointing to CHARLI Server with `X-API-Key`
+- `AudioManager.swift` — Bluetooth audio routing, recording, playback
+- `ContentView.swift` — UI with animated status orb
+- `CHARLIGlassesApp.swift` — App entry point
+
+No Python backend — the old `charli_glasses/api/` has been removed.
 
 ## Development
 
@@ -101,7 +101,7 @@ npm install
 cp .env.example .env         # Fill in OPENCLAW_TOKEN
 npx prisma migrate dev       # Create/update DB
 npx prisma db seed            # Seed devices (prints API keys)
-npm run start:dev             # Hot-reload dev server
+npm run start:dev             # Hot-reload dev server — Swagger at /docs
 ```
 
 ### Testing
@@ -144,9 +144,10 @@ python3 charli_home/src/charli_server_client.py
 
 ## Conventions
 
-- Python modules in `src/` follow single-responsibility — each does ONE thing
-- NestJS modules follow standard NestJS patterns (module/service/controller)
-- The JARVIS UI is vanilla HTML/CSS/JS (no build step)
+- Devices are pure clients — no backend logic, no server code
+- All backend logic lives in charli_server (NestJS + Python sidecar)
+- NestJS modules follow standard patterns (module/service/controller)
+- The JARVIS UI is vanilla HTML/CSS/JS (no build step), connects to server via Socket.IO
 - Responses from CHARLI are 1-3 sentences, no markdown, natural spoken style
 - Audio format: 16kHz mono WAV for recording, WAV for TTS responses
 - Auth: API key per device via `X-API-Key` header
@@ -159,3 +160,5 @@ Detailed docs live in `docs/charli_server/`:
 - `api-reference.md` — Full endpoint documentation
 - `architecture.md` — System design and rationale
 - `device-migration.md` — How to migrate devices to the central server
+- `orchestration.md` — How to run the full stack (dev + production)
+- `future-improvements.md` — Roadmap and upgrade paths

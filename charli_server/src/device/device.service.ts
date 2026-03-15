@@ -7,9 +7,10 @@ export class DeviceService {
   constructor(private prisma: PrismaService) {}
 
   async findAll() {
-    return this.prisma.device.findMany({
+    const devices = await this.prisma.device.findMany({
       orderBy: { createdAt: 'asc' },
     });
+    return devices.map(({ apiKey, ...rest }) => rest);
   }
 
   async findById(id: string) {
@@ -37,9 +38,10 @@ export class DeviceService {
   }
 
   async update(id: string, data: { systemPrompt?: string; maxTokens?: number }) {
-    return this.prisma.device.update({
+    const { apiKey, ...rest } = await this.prisma.device.update({
       where: { id },
       data,
     });
+    return rest;
   }
 }

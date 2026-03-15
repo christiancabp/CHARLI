@@ -6,7 +6,7 @@
     <title>C.H.A.R.L.I.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/charli.css">
+    <link rel="stylesheet" href="/css/charli.css">
 </head>
 <body>
     <!-- Scan-line overlay for CRT/HUD effect -->
@@ -36,13 +36,15 @@
             <div class="transcript-header">TRANSCRIPT</div>
             <div class="transcript" id="transcript">
                 <div class="transcript-entry system">
-                    CHARLI Home initialized. Awaiting wake word...
+                    CHARLI Home initialized. Connecting to server...
                 </div>
             </div>
         </section>
     </main>
 
-    <script src="/static/js/orb.js"></script>
-    <script src="/static/js/charli.js"></script>
+    <!-- Socket.IO client — connects to charli_server for real-time events -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="/js/orb.js"></script>
+    <script src="/js/charli.js"></script>
 </body>
 </html>
