@@ -9,7 +9,7 @@ echo "Running Prisma db push..."
 npx prisma db push
 
 echo "Running seed (upsert — safe to re-run)..."
-npx ts-node prisma/seed.ts 2>/dev/null || true
+npx tsx prisma/seed.ts || true
 
 echo "Starting CHARLI Server..."
 exec node dist/src/main.js

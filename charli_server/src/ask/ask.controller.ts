@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiSecurity } from '@nestjs/swagger';
 import { AskService } from './ask.service';
 import { AskDto, AskVisionDto } from './dto/ask.dto';
@@ -28,6 +28,11 @@ export class AskController {
   @ApiResponse({ status: 200, description: 'Question answered successfully' })
   @ApiResponse({ status: 401, description: 'Invalid or missing API key' })
   async ask(@Body() dto: AskDto, @CurrentDevice() device: Device) {
+    if (!device) {
+      throw new UnauthorizedException(
+        'Admin key cannot be used with /api/ask — use a device API key',
+      );
+    }
     // CLI devices get more conversation context (10 turns vs 3 for voice)
     const maxTurns = device.type === 'cli' ? 10 : 3;
     const history = await this.conversationService.getHistory(device.id, maxTurns);
@@ -66,6 +71,11 @@ export class AskController {
   @ApiResponse({ status: 200, description: 'Vision query answered successfully' })
   @ApiResponse({ status: 401, description: 'Invalid or missing API key' })
   async askVision(@Body() dto: AskVisionDto, @CurrentDevice() device: Device) {
+    if (!device) {
+      throw new UnauthorizedException(
+        'Admin key cannot be used with /api/ask — use a device API key',
+      );
+    }
     const answer = await this.askService.ask({
       question: dto.question,
       language: dto.language || 'en',

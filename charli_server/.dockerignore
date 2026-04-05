@@ -2,7 +2,7 @@ node_modules/
 dist/
 prisma/charli.db
 prisma/charli.db-journal
-prisma/generated/
+# prisma/generated/ — included for Docker build (pre-generated locally)
 sidecar/
 .env
 *.js.map

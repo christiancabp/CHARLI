@@ -1,5 +1,9 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────
-# Install deps, generate Prisma client, compile TypeScript.
+# Install deps, compile TypeScript.
+# IMPORTANT: Prisma client is pre-generated locally (npx prisma generate).
+#   Prisma 7's `generate` output differs by platform — the macOS version
+#   produces CJS-compatible .ts; Docker's Node 22 Alpine produces ESM with
+#   import.meta.url, which breaks the CJS build. So we copy the local output.
 FROM node:22-alpine AS builder
 
 WORKDIR /app
@@ -7,18 +11,15 @@ WORKDIR /app
 # 1. Copy package files first — Docker caches this layer if they haven't changed.
 COPY package*.json ./
 
-# 2. Copy Prisma schema + config so `prisma generate` can run during install.
-COPY prisma/schema.prisma prisma/schema.prisma
+# 2. Copy Prisma schema, config, and pre-generated client.
+COPY prisma/ prisma/
 COPY prisma.config.ts prisma.config.ts
 
 # 3. Install ALL dependencies (including devDependencies for the build step).
 #    --legacy-peer-deps: @nestjs/swagger@11 expects @nestjs/common@^11 but we use v10.
 RUN npm ci --legacy-peer-deps
 
-# 4. Generate the Prisma client into prisma/generated/.
-RUN npx prisma generate
-
-# 5. Copy source code and build config, then compile.
+# 4. Copy source code and build config, then compile.
 COPY src/ src/
 COPY tsconfig*.json ./
 RUN npm run build

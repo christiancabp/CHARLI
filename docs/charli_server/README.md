@@ -48,7 +48,7 @@ npm install
 # The DB connection is configured in prisma.config.ts and .env, NOT in schema.prisma.
 npx prisma generate         # Generate the Prisma client into prisma/generated/
 npx prisma db push          # Create/sync the SQLite database
-npx ts-node prisma/seed.ts  # Create default devices (prints API keys — save them!)
+npx tsx prisma/seed.ts  # Create default devices (prints API keys — save them!)
 
 npm run start:dev           # → http://localhost:3000
 ```

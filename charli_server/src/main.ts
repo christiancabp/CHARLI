@@ -35,7 +35,11 @@ async function bootstrap() {
 
 **Auth:** All \`/api/*\` endpoints require an \`X-API-Key\` header. Get a key by registering a device via \`POST /api/devices\` (requires admin key).
 
-**Python Sidecar:** STT (faster-whisper) and TTS (espeak-ng/Piper) run in a separate Python process on localhost:3001. This server proxies to it.`,
+**Python Sidecar:** STT (faster-whisper) and TTS (espeak-ng/Piper) run in a separate Python process on localhost:3001. This server proxies to it.
+
+**Device Types:** \`desk-hub\` (voice, short answers), \`smart-glasses\` (voice, concise), \`cli\` (text, markdown, longer answers). Each type has its own system prompt and max tokens.
+
+**Docker:** Run \`docker compose up\` from this directory. Requires \`npx prisma generate\` locally first (Prisma 7 codegen is platform-specific).`,
     )
     .setVersion('0.1.0')
     .addApiKey(

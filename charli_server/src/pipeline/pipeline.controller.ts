@@ -5,6 +5,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFiles,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -61,6 +62,11 @@ export class PipelineController {
     @CurrentDevice() device: Device,
     @Res() res: Response,
   ) {
+    if (!device) {
+      throw new UnauthorizedException(
+        'Admin key cannot be used with /api/pipeline — use a device API key',
+      );
+    }
     const audioFile = files.audio?.[0];
     if (!audioFile) {
       res.status(400).json({ error: 'Missing audio file' });
@@ -140,6 +146,11 @@ export class PipelineController {
     files: { audio?: Express.Multer.File[]; image?: Express.Multer.File[] },
     @CurrentDevice() device: Device,
   ) {
+    if (!device) {
+      throw new UnauthorizedException(
+        'Admin key cannot be used with /api/pipeline — use a device API key',
+      );
+    }
     const audioFile = files.audio?.[0];
     if (!audioFile) {
       return { error: 'Missing audio file' };

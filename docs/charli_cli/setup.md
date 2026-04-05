@@ -103,7 +103,7 @@ The seed script creates a `charli-cli` device automatically:
 
 ```bash
 cd charli_server
-npx ts-node prisma/seed.ts
+npx tsx prisma/seed.ts
 # Output:
 #   CLI:      charli-cli (key: chk_abc123...)
 ```

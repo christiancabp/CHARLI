@@ -6,7 +6,7 @@ How to point existing CHARLI devices to the new central server.
 
 1. CHARLI Server running on Mac Mini (`npm run start:dev` in `charli_server/`)
 2. Python sidecar running (`python3 sidecar.py` in `charli_server/sidecar/`)
-3. Devices registered and API keys generated (`npx ts-node prisma/seed.ts`)
+3. Devices registered and API keys generated (`npx tsx prisma/seed.ts`)
 
 ## Pi Desk Hub (charli-home)
 

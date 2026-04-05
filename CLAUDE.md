@@ -36,6 +36,8 @@ NestJS (TypeScript) with Prisma 7 + SQLite. Key details:
   - `src/prisma/prisma.service.ts` — Runtime adapter setup. Also reads `DATABASE_URL`.
   - `prisma/generated/` — Auto-generated client (gitignored). Run `npx prisma generate` after schema changes.
   - Import types with `from '@prisma/generated'` (tsconfig path alias).
+  - **Platform gotcha:** `npx prisma generate` produces different output per platform. macOS generates CJS-compatible `.ts`; Docker's Node 22 Alpine generates ESM with `import.meta.url` and `.ts` import extensions, which breaks the CJS build. The Docker image copies the locally-generated client — always run `npx prisma generate` locally before `docker compose build`.
+- **Build output:** TypeScript compiles to `dist/src/` (not `dist/`) because `tsconfig.json` includes both `src/` and `prisma/` paths, widening `rootDir`. Entry point is `dist/src/main.js`.
 - **API keys:** `GET /api/devices` strips `apiKey` from responses. Keys only visible on `POST /api/devices` (creation).
 
 Modules:
@@ -135,10 +137,23 @@ cp .env.example .env         # Fill in OPENCLAW_TOKEN
 # Prisma 7 setup:
 npx prisma generate          # Generate client to prisma/generated/
 npx prisma db push           # Create/sync SQLite DB at prisma/charli.db
-npx ts-node prisma/seed.ts   # Seed devices (prints API keys — save them!)
+npx tsx prisma/seed.ts       # Seed devices (prints API keys — save them!)
 
 npm run start:dev             # Hot-reload dev server — Swagger at /docs
 ```
+
+### Docker Compose (runs server + sidecar)
+
+```bash
+cd charli_server
+npx prisma generate          # MUST run locally first (see Prisma platform gotcha above)
+docker compose up --build    # Build + start both containers
+docker compose up -d         # Detached mode
+docker compose down          # Stop
+docker compose down -v       # Stop + delete volumes (resets DB!)
+```
+
+Docker networking: sidecar is `http://sidecar:3001`, OpenClaw on host is `http://host.docker.internal:18789`. Both are overridden in `docker-compose.yml` environment block.
 
 ### Testing
 

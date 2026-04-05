@@ -27,7 +27,7 @@ Edit `.env` and fill in:
 npm install
 npx prisma generate          # Generate Prisma client → prisma/generated/
 npx prisma db push           # Create SQLite DB → prisma/charli.db
-npx ts-node prisma/seed.ts   # Seed default devices (save the API keys!)
+npx tsx prisma/seed.ts       # Seed default devices (save the API keys!)
 npm run start:dev            # → http://localhost:3000 (hot-reload)
 ```
 
@@ -60,7 +60,7 @@ open http://localhost:3000/docs            # Swagger UI
 | `npm run format` | Format with Prettier |
 | `npx prisma generate` | Regenerate Prisma client (after schema changes) |
 | `npx prisma db push` | Sync schema to SQLite DB |
-| `npx ts-node prisma/seed.ts` | Seed/re-seed devices (upsert, safe to repeat) |
+| `npx tsx prisma/seed.ts` | Seed/re-seed devices (upsert, safe to repeat) |
 | `npx prisma studio` | Open Prisma Studio (DB browser) |
 
 ## Testing Endpoints

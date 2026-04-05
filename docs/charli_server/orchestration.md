@@ -41,7 +41,7 @@ cp .env.example .env             # First time only — fill in OPENCLAW_TOKEN
 #   3. Seed default devices (save the API keys it prints!)
 npx prisma generate
 npx prisma db push
-npx ts-node prisma/seed.ts
+npx tsx prisma/seed.ts
 
 npm run start:dev
 # → CHARLI Server running on http://localhost:3000
@@ -126,6 +126,12 @@ cd charli_server
 # (not localhost — that would be inside the container).
 cp .env.example .env
 
+# Generate Prisma client locally BEFORE building Docker.
+# Prisma 7's codegen output differs by platform — the macOS version
+# produces CJS-compatible TypeScript, while Docker's Node 22 Alpine
+# produces ESM with import.meta.url that breaks the CJS build.
+npx prisma generate
+
 docker compose up          # foreground (see logs inline)
 docker compose up -d       # background (detached)
 ```
@@ -134,6 +140,8 @@ On first startup, the server container automatically:
 1. Runs `prisma db push` to create/sync the SQLite database
 2. Runs the seed script to create default devices (upsert — safe to re-run)
 3. Starts the NestJS server
+
+> **Note:** The Docker image uses the locally pre-generated Prisma client (copied from `prisma/generated/`). Always run `npx prisma generate` after schema changes before rebuilding Docker.
 
 **Save the API keys** printed in the logs on first run — you need them for device config.
 
@@ -153,7 +161,7 @@ docker compose build --no-cache     # Rebuild images from scratch
 The seed runs automatically on every startup (uses upsert, so it's safe). To manually re-seed:
 
 ```bash
-docker compose exec server npx ts-node prisma/seed.ts
+docker compose exec server npx tsx prisma/seed.ts
 ```
 
 ### Docker Desktop
@@ -211,7 +219,7 @@ module.exports = {
     {
       name: 'charli-server',
       cwd: './charli_server',
-      script: 'dist/main.js',
+      script: 'dist/src/main.js',
       // Start after sidecar is ready
       wait_ready: true,
       env: {
@@ -280,7 +288,7 @@ Requires=charli-sidecar.service
 Type=simple
 User=charli
 WorkingDirectory=/home/charli/CHARLI/charli_server
-ExecStart=/usr/bin/node dist/main.js
+ExecStart=/usr/bin/node dist/src/main.js
 Restart=always
 RestartSec=5
 EnvironmentFile=/home/charli/CHARLI/charli_server/.env
