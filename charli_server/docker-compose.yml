@@ -18,6 +18,7 @@ services:
       # - OpenClaw runs on the host machine, not inside Docker.
       SIDECAR_URL: http://sidecar:3001
       DATABASE_URL: file:./prisma/charli.db
+      OPENCLAW_URL: http://host.docker.internal:18789
     volumes:
       - db-data:/app/prisma    # Persist SQLite DB across restarts
     depends_on:

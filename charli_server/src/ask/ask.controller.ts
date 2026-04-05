@@ -28,7 +28,9 @@ export class AskController {
   @ApiResponse({ status: 200, description: 'Question answered successfully' })
   @ApiResponse({ status: 401, description: 'Invalid or missing API key' })
   async ask(@Body() dto: AskDto, @CurrentDevice() device: Device) {
-    const history = await this.conversationService.getHistory(device.id);
+    // CLI devices get more conversation context (10 turns vs 3 for voice)
+    const maxTurns = device.type === 'cli' ? 10 : 3;
+    const history = await this.conversationService.getHistory(device.id, maxTurns);
 
     const conversation = await this.conversationService.addMessage(
       device.id,

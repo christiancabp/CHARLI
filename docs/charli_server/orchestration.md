@@ -74,6 +74,25 @@ Set in the app's UserDefaults (or hardcode for now):
 
 Build and run from Xcode.
 
+### CLI (Any Machine on Tailscale)
+
+```bash
+cd charli_cli
+npm install
+npm run build
+
+# Setup wizard — detects Tailscale, suggests server URL, saves config
+node bin/charli.js init
+
+# Check connection
+node bin/charli.js status
+
+# Talk to CHARLI
+node bin/charli.js ask "Hello!"
+```
+
+Config is saved to `~/.charli/config.json`. Env vars `CHARLI_SERVER_URL` and `CHARLI_API_KEY` override file values.
+
 ---
 
 ## Startup Order
@@ -84,7 +103,7 @@ Order matters — each service depends on the one above it:
 1. OpenClaw          (already running on Mac Mini:18789)
 2. Python Sidecar    (Mac Mini:3001 — loads Whisper model)
 3. NestJS Server     (Mac Mini:3000 — connects to sidecar + OpenClaw)
-4. Devices           (Pi, iPhone — connect to NestJS server)
+4. Devices           (Pi, iPhone, CLI — connect to NestJS server)
 ```
 
 If the sidecar isn't running, STT and TTS endpoints will fail gracefully (return errors). The server itself stays up.

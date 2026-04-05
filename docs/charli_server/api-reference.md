@@ -130,7 +130,9 @@ Requires admin API key (`ADMIN_API_KEY` env var).
 }
 ```
 
-**Valid device types:** `desk-hub`, `smart-glasses`, `phone`
+**Valid device types:** `desk-hub`, `smart-glasses`, `phone`, `cli`
+
+> **Note:** `cli` devices get markdown-formatted responses (longer, with code blocks) and 10 turns of conversation history (vs 3 for voice device types).
 
 ### PATCH `/api/devices/:id`
 Update device configuration. API key cannot be changed.

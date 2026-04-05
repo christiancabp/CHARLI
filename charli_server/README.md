@@ -67,6 +67,7 @@ open http://localhost:3000/docs            # Swagger UI
 
 ```bash
 # Ask a question (use API key from seed output)
+# The seed creates 3 devices: charli-home (desk-hub), charli-glasses (smart-glasses), charli-cli (cli)
 curl -X POST http://localhost:3000/api/ask \
   -H "X-API-Key: chk_..." \
   -H "Content-Type: application/json" \
@@ -151,3 +152,4 @@ charli_server/
 - [Orchestration](../docs/charli_server/orchestration.md) — Dev, Docker, and PM2 setup
 - [Device Migration](../docs/charli_server/device-migration.md) — Adding new devices
 - [Future Improvements](../docs/charli_server/future-improvements.md) — Roadmap
+- [CLI Client](../docs/charli_cli/README.md) — Terminal client overview + setup

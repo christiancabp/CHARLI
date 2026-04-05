@@ -8,7 +8,7 @@
 
 ---
 
-**Desk Hub** · **Smart Glasses** · **Future Devices**
+**Desk Hub** · **Smart Glasses** · **CLI** · **Future Devices**
 all connected to one central brain
 
 [![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=flat&logo=nestjs&logoColor=white)](https://nestjs.com/)
@@ -25,7 +25,7 @@ all connected to one central brain
 
 ## What is CHARLI?
 
-CHARLI is a personal AI assistant that lives across multiple devices — a desk hub with a touchscreen, smart glasses, and whatever comes next. Say **"Hey Charli"** and get a spoken response, ask about what you're looking at through the glasses camera, or just type a question.
+CHARLI is a personal AI assistant that lives across multiple devices — a desk hub with a touchscreen, smart glasses, a terminal CLI, and whatever comes next. Say **"Hey Charli"** and get a spoken response, ask about what you're looking at through the glasses camera, or type a question from any terminal.
 
 All devices are **thin clients**. They handle hardware (mic, speaker, screen, camera) and nothing else. One central server does all the thinking.
 
@@ -41,6 +41,7 @@ All devices are **thin clients**. They handle hardware (mic, speaker, screen, ca
                     │                                             │
  Pi Desk Hub ──────►│  CHARLI Server    Python Sidecar   OpenClaw │
  iPhone Glasses ───►│  (NestJS :3000)   (FastAPI :3001)  (:18789) │
+ CLI (Terminal) ───►│                                             │
  Future Device ────►│                                             │
                     │  Auth · Pipeline   Whisper STT     LLM      │
                     │  WebSocket · DB    TTS (Piper)     Gateway  │
@@ -98,6 +99,23 @@ Meta Ray-Ban Display smart glasses as a wearable CHARLI interface.
 > *"Hey Charli, what am I looking at?"*
 > *"That's the Rockefeller Center, sir."*
 
+### CHARLI CLI — Terminal Client
+
+Talk to CHARLI from any terminal on the Tailscale network.
+
+- **Text chat** — `charli ask "What is a Raspberry Pi?"` with markdown responses
+- **Setup wizard** — `charli init` auto-detects Tailscale, suggests server URL
+- **Status check** — `charli status` shows config, Tailscale, and server health
+- **Conversation context** — Follow-up questions remember the last 10 exchanges
+
+```
+$ charli ask "Explain what an API key is"
+⠋ Thinking...
+
+CHARLI
+An API key is a secret string that identifies your device to a server...
+```
+
 ---
 
 ## Tech Stack
@@ -111,6 +129,7 @@ Meta Ray-Ban Display smart glasses as a wearable CHARLI interface.
 | **LLM** | OpenClaw gateway | Routes to Claude, Gemini, local models |
 | **Desk Hub** | Raspberry Pi 5 + Python | Wake word, mic, speaker, touchscreen |
 | **Glasses** | Swift / SwiftUI (iOS) | Bluetooth audio, camera capture |
+| **CLI** | Node.js + Commander.js | Terminal text chat from any machine |
 | **Real-time** | Socket.IO | Live state + message broadcasting |
 | **Network** | Tailscale | Private mesh VPN connecting all devices |
 | **API Docs** | Swagger / OpenAPI | Interactive docs at `/docs` |
@@ -149,6 +168,14 @@ python3 charli_home.py
 
 **Glasses (iOS):**
 Set server URL and API key in the app, build from Xcode, and go.
+
+**CLI (any machine on Tailscale):**
+```bash
+cd charli_cli
+npm install && npm run build
+node bin/charli.js init     # Setup wizard (detects Tailscale, saves config)
+node bin/charli.js ask "Hello CHARLI!"
+```
 
 ### 3. Talk to CHARLI
 
@@ -194,6 +221,10 @@ CHARLI/
 ├── charli_glasses/          Smart glasses (thin client)
 │   └── ios/                 Swift/SwiftUI companion app
 │
+├── charli_cli/              Terminal client (thin client)
+│   ├── src/                 TypeScript source (commands, lib)
+│   └── bin/charli.js        Entry point
+│
 └── docs/                    Documentation
     ├── charli_server/       Server docs (architecture, API, setup)
     ├── charli_glasses/      Glasses proposal + design
@@ -233,6 +264,9 @@ All `/api/*` endpoints require `X-API-Key` header. Full interactive docs at `/do
 | [`docs/charli_server/future-improvements.md`](docs/charli_server/future-improvements.md) | Roadmap + 20 improvement ideas |
 | [`charli_home/README.md`](charli_home/README.md) | Desk hub setup (Pi) |
 | [`charli_glasses/README.md`](charli_glasses/README.md) | Glasses setup (iOS) |
+| [`docs/charli_cli/README.md`](docs/charli_cli/README.md) | CLI overview + architecture |
+| [`docs/charli_cli/setup.md`](docs/charli_cli/setup.md) | CLI setup, config, Tailscale |
+| [`docs/charli_cli/usage.md`](docs/charli_cli/usage.md) | CLI command reference |
 
 ---
 
@@ -245,10 +279,15 @@ All `/api/*` endpoints require `X-API-Key` header. Full interactive docs at `/do
 - [x] iOS glasses app with vision support
 - [x] Swagger API documentation
 - [x] Socket.IO real-time cross-device updates
+- [x] Docker Compose for one-command deployment
+- [x] CLI terminal client with Tailscale auto-detection
 - [ ] Piper TTS for natural voice
 - [ ] Voice Activity Detection (stop recording on silence)
 - [ ] Streaming LLM responses
 - [ ] Pi camera for desk hub vision
+- [ ] CLI interactive REPL mode (`charli chat`)
+- [ ] CLI voice + vision commands
+- [ ] Streaming LLM responses (SSE)
 - [ ] Smart home integration
 - [ ] Admin dashboard
 

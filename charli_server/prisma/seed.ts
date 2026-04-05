@@ -39,6 +39,12 @@ Speak naturally, like a personal assistant talking in someone's ear.
 Be concise — the user is on the move and needs quick, clear answers.
 Respond in {lang_name}.`;
 
+const CLI_PROMPT = `You are CHARLI, a helpful personal assistant responding in a terminal/CLI.
+You may use markdown formatting: headers, bold, code blocks, bullet points, numbered lists.
+Give thorough, detailed answers — the user is reading on a screen, not listening.
+For code, always use fenced code blocks with language tags.
+Respond in {lang_name}.`;
+
 async function main() {
   console.log('Seeding CHARLI database...');
 
@@ -71,6 +77,21 @@ async function main() {
     },
   });
   console.log(`  Glasses:  ${glasses.name} (key: ${glasses.apiKey})`);
+
+  // Device name: "charli-cli" (kebab-case)
+  // Device type: "cli" — terminal client, allows markdown + longer responses
+  const cli = await prisma.device.upsert({
+    where: { name: 'charli-cli' },
+    update: {},
+    create: {
+      name: 'charli-cli',
+      type: 'cli',
+      apiKey: `chk_${uuid().replace(/-/g, '')}`,
+      systemPrompt: CLI_PROMPT,
+      maxTokens: 1024,
+    },
+  });
+  console.log(`  CLI:      ${cli.name} (key: ${cli.apiKey})`);
 
   console.log('Done! Save the API keys above — you will need them for device config.');
 }

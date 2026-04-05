@@ -84,11 +84,9 @@ export class AskService {
     // Build messages array
     const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }];
 
-    // Add conversation history (last N turns)
+    // Add conversation history (already sliced by caller)
     if (history?.length) {
-      const maxTurns = 3;
-      const recent = history.slice(-(maxTurns * 2));
-      for (const entry of recent) {
+      for (const entry of history) {
         messages.push({ role: entry.role, content: entry.content });
       }
     }

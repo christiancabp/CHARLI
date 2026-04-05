@@ -198,23 +198,9 @@ Run multiple sidecar processes for parallel transcription.
 
 **Impact:** Handle concurrent requests from multiple devices without queueing.
 
-### 18. Docker Compose
+### 18. ~~Docker Compose~~ (DONE)
 
-Package everything in containers for one-command deployment.
-
-```yaml
-services:
-  server:
-    build: ./charli_server
-    ports: ["3000:3000"]
-    depends_on: [sidecar, openclaw]
-  sidecar:
-    build: ./charli_server/sidecar
-    ports: ["3001:3001"]
-  openclaw:
-    image: openclaw/openclaw
-    ports: ["18789:18789"]
-```
+Implemented in `charli_server/docker-compose.yml`. One-command deployment for NestJS + sidecar. See [orchestration docs](orchestration.md#docker-compose).
 
 ### 19. End-to-End Tests
 
@@ -226,7 +212,18 @@ Automated tests that exercise the full pipeline.
 - Mock the sidecar and OpenClaw for CI
 - Run with: `npm run test:e2e`
 
-### 20. Admin Dashboard
+### 20. CLI Enhancements
+
+The `charli_cli` POC is live with `ask`, `status`, and `init` commands. Next phases:
+
+- **Phase 2 — Interactive REPL:** `charli chat` with persistent readline loop, `/clear`, `/exit`
+- **Phase 3 — Voice:** `charli voice` records mic → pipeline → plays audio response
+- **Phase 4 — Vision:** `charli ask --image ./photo.jpg "What is this?"`
+- **Phase 5 — Streaming:** SSE integration with `POST /api/ask/stream` for real-time token display
+- **Phase 6 — Rich TUI:** Migrate to React + Ink for animated UI
+- **Phase 7 — npm publish:** Remove `"private": true`, publish as `@charli/cli`
+
+### 21. Admin Dashboard
 
 Web UI for managing devices, viewing conversations, and monitoring health.
 

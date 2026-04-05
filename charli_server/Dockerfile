@@ -12,7 +12,8 @@ COPY prisma/schema.prisma prisma/schema.prisma
 COPY prisma.config.ts prisma.config.ts
 
 # 3. Install ALL dependencies (including devDependencies for the build step).
-RUN npm ci
+#    --legacy-peer-deps: @nestjs/swagger@11 expects @nestjs/common@^11 but we use v10.
+RUN npm ci --legacy-peer-deps
 
 # 4. Generate the Prisma client into prisma/generated/.
 RUN npx prisma generate

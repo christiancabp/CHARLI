@@ -74,6 +74,7 @@ Simple API key per device, validated via `X-API-Key` header.
 - An `ADMIN_API_KEY` env var allows bootstrapping (creating first devices)
 - No sessions, no JWT — appropriate for a private Tailscale network
 - **Security:** `GET /api/devices` never returns API keys. Keys are shown only once on creation.
+- CLI devices can register via `charli init` (needs admin key) or use a pre-seeded key
 
 ## Database (Prisma 7 + SQLite)
 
@@ -86,6 +87,7 @@ Device (id, name, type, apiKey, systemPrompt, maxTokens, lastSeen)
 - Each device has a custom system prompt stored in the DB
 - One active conversation per device for context tracking
 - Messages cascade-delete when conversation is cleared
+- Conversation history depth varies by device type: `cli` gets 10 turns, voice devices get 3
 
 ### Prisma 7 Changes
 

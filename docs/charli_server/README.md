@@ -7,8 +7,8 @@ Central NestJS backend for all CHARLI devices. Runs on the Mac Mini alongside Op
 ```
 Pi Desk Hub ─────┐                                                    ┌→ OpenClaw (Mac Mini:18789)
 iPhone (Glasses) ─┼──→ CHARLI Server (NestJS, Mac Mini:3000) ────────┤
-Future Devices ───┘         │                                         └→ Python Sidecar (Mac Mini:3001)
-                        SQLite DB                                         faster-whisper + espeak-ng/Piper
+CLI (Terminal) ───┤         │                                         └→ Python Sidecar (Mac Mini:3001)
+Future Devices ───┘     SQLite DB                                         faster-whisper + espeak-ng/Piper
 ```
 
 **Two processes:**
@@ -101,8 +101,8 @@ open http://localhost:3000/docs
 | Context | Convention | Examples |
 |---------|-----------|----------|
 | Directory / module names | `snake_case` | `charli_server`, `charli_home`, `charli_glasses` |
-| Device names (DB, API) | `kebab-case` | `charli-home`, `charli-glasses` |
-| Device types (DB, prompts) | `kebab-case` | `desk-hub`, `smart-glasses`, `phone` |
+| Device names (DB, API) | `kebab-case` | `charli-home`, `charli-glasses`, `charli-cli` |
+| Device types (DB, prompts) | `kebab-case` | `desk-hub`, `smart-glasses`, `phone`, `cli` |
 
 ## Project Structure
 
@@ -139,4 +139,4 @@ charli_server/
 
 - **Prisma 7 driver adapter:** No Rust engine — uses `@prisma/adapter-better-sqlite3` directly. Connection URL lives in `.env` and is read by both `prisma.config.ts` (CLI) and `prisma.service.ts` (runtime).
 - **API keys not leaked:** `GET /api/devices` strips `apiKey` from responses. Keys are only shown once on `POST /api/devices` (creation).
-- **System prompts per device type:** Defaults in `src/ask/prompts/system-prompts.ts`, overridable per device via the DB `systemPrompt` field.
+- **System prompts per device type:** Defaults in `src/ask/prompts/system-prompts.ts`, overridable per device via the DB `systemPrompt` field. Voice device types (`desk-hub`, `smart-glasses`, `phone`) get short spoken responses; the `cli` type gets longer markdown-formatted responses with 10 turns of conversation context (vs 3 for voice).

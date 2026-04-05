@@ -12,19 +12,20 @@ CHARLI (C.H.A.R.L.I.) is a personal AI assistant ecosystem with multiple devices
 2. **Python Sidecar** (`charli_server/sidecar/`) — FastAPI ML worker (faster-whisper STT + espeak-ng/Piper TTS). Runs alongside NestJS on Mac Mini.
 3. **Desk Hub** (`charli_home/`) — Raspberry Pi 5 thin client. Hardware I/O only: wake word, mic, speaker, touchscreen UI. Zero backend logic.
 4. **Glasses** (`charli_glasses/ios/`) — iOS companion app for Meta Ray-Ban glasses. Pure client: records audio, sends to server, plays response.
+5. **CLI** (`charli_cli/`) — Terminal client (Node.js). Text chat with CHARLI from any machine on the Tailscale network. Inspired by claude-code patterns.
 
 ## Architecture
 
 ```
 Pi Desk Hub ─────┐                                                    ┌→ OpenClaw (Mac Mini:18789)
 iPhone (Glasses) ─┼──→ CHARLI Server (NestJS, Mac Mini:3000) ────────┤
-Future Devices ───┘         │                                         └→ Python Sidecar (Mac Mini:3001)
-                        SQLite DB                                         faster-whisper + espeak-ng/Piper
+CLI (any machine) ┤         │                                         └→ Python Sidecar (Mac Mini:3001)
+Future Devices ───┘     SQLite DB                                         faster-whisper + espeak-ng/Piper
 ```
 
-**Devices are thin clients** — they capture input (audio, images) and play output (audio). ALL processing lives on the Mac Mini. No server code runs on devices.
+**Devices are thin clients** — they capture input (audio, images, text) and play/display output. ALL processing lives on the Mac Mini. No server code runs on devices.
 
-**State machine** (same across all devices): `IDLE → LISTENING → THINKING → SPEAKING → IDLE`
+**State machine** (voice devices): `IDLE → LISTENING → THINKING → SPEAKING → IDLE`
 
 ### CHARLI Server (`charli_server/`)
 
@@ -86,6 +87,23 @@ iOS companion app (Swift/SwiftUI):
 
 No Python backend — the old `charli_glasses/api/` has been removed.
 
+### CLI (`charli_cli/`)
+
+Terminal client (Node.js/TypeScript). Uses native `fetch` + Commander.js:
+- `src/cli.ts` — Commander program, command routing
+- `src/commands/ask.ts` — `charli ask "question"` text chat
+- `src/commands/status.ts` — `charli status` health/config check
+- `src/commands/init.ts` — `charli init` setup wizard (server URL, API key, Tailscale detection)
+- `src/lib/api-client.ts` — HTTP client wrapping `/api/ask` and `/health`
+- `src/lib/config.ts` — Loads/saves `~/.charli/config.json`, env var overrides
+- `src/lib/tailscale.ts` — Tailscale detection for auto-suggesting server URL
+- `src/lib/output.ts` — Chalk-based formatting helpers
+- `bin/charli.js` — Entry point (`#!/usr/bin/env node`)
+
+Config: `~/.charli/config.json` with `CHARLI_SERVER_URL` / `CHARLI_API_KEY` env var overrides.
+
+CLI device type gets markdown-formatted responses, code blocks, longer answers (1024 max tokens), and 10 turns of conversation history (vs 3 for voice devices).
+
 ## Development
 
 ### Running the Full Stack
@@ -100,6 +118,11 @@ cd charli_server && npm run start:dev                   # → localhost:3000
 # Terminal 3: Desk Hub (Pi, via SSH)
 ssh charli@charli-home.local
 cd ~/charli-home && python3 charli_home.py              # → localhost:8080
+
+# Terminal 4: CLI (any machine on Tailscale)
+cd charli_cli && npm run build
+node bin/charli.js init                                # → setup wizard
+node bin/charli.js ask "Hello CHARLI!"                 # → text chat
 ```
 
 ### CHARLI Server Development
@@ -155,13 +178,17 @@ python3 charli_home/src/charli_server_client.py
 - `charli_server_url` — Central server URL
 - `charli_api_key` — API key for glasses device
 
+#### CLI (`~/.charli/config.json` or env vars)
+- `CHARLI_SERVER_URL` — Central server URL (e.g., `http://charli-server:3000`)
+- `CHARLI_API_KEY` — API key for this CLI device
+
 ## Naming Conventions
 
 | Context | Convention | Examples |
 |---------|-----------|----------|
-| Directory / module names | `snake_case` | `charli_server`, `charli_home`, `charli_glasses` |
-| Device names (DB, API) | `kebab-case` | `charli-home`, `charli-glasses` |
-| Device types (DB, prompts) | `kebab-case` | `desk-hub`, `smart-glasses`, `phone` |
+| Directory / module names | `snake_case` | `charli_server`, `charli_home`, `charli_glasses`, `charli_cli` |
+| Device names (DB, API) | `kebab-case` | `charli-home`, `charli-glasses`, `charli-cli` |
+| Device types (DB, prompts) | `kebab-case` | `desk-hub`, `smart-glasses`, `phone`, `cli` |
 
 ## Conventions
 
@@ -169,7 +196,7 @@ python3 charli_home/src/charli_server_client.py
 - All backend logic lives in charli_server (NestJS + Python sidecar)
 - NestJS modules follow standard patterns (module/service/controller)
 - The JARVIS UI is vanilla HTML/CSS/JS (no build step), connects to server via Socket.IO
-- Responses from CHARLI are 1-3 sentences, no markdown, natural spoken style
+- Responses from CHARLI are 1-3 sentences for voice devices (no markdown, natural spoken style); CLI gets longer markdown-formatted responses
 - Audio format: 16kHz mono WAV for recording, WAV for TTS responses
 - Auth: API key per device via `X-API-Key` header
 - Database: SQLite via Prisma 7 driver adapter (swap adapter + provider for Postgres)
@@ -184,3 +211,8 @@ Detailed docs live in `docs/charli_server/`:
 - `device-migration.md` — How to migrate devices to the central server
 - `orchestration.md` — How to run the full stack (dev + production)
 - `future-improvements.md` — Roadmap and upgrade paths
+
+CLI docs live in `docs/charli_cli/`:
+- `README.md` — Overview and architecture
+- `setup.md` — Installation, `charli init`, Tailscale, config
+- `usage.md` — Command reference and examples

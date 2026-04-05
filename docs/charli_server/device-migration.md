@@ -135,3 +135,54 @@ The iOS app's `CHARLIAPIClient.swift` now points to the central server instead o
 | Voice + vision (camera image) | `sendVoiceQuery(audioURL:imageData:)` | `/api/pipeline/voice` |
 | Text only (typed question) | `sendTextQuery(question:)` | `/api/ask` |
 | Text + image (camera snapshot) | `sendVisionQuery(question:imageData:)` | `/api/ask/vision` |
+
+---
+
+## CLI (charli-cli)
+
+### What It Is
+
+A Node.js terminal client that talks to CHARLI via `POST /api/ask`. No voice, no sidecar interaction — pure text chat with markdown-formatted responses.
+
+### Setup
+
+```bash
+cd charli_cli
+npm install && npm run build
+
+# Interactive setup wizard
+node bin/charli.js init
+# → Detects Tailscale, suggests server URL
+# → Paste an existing API key or register a new device (needs admin key)
+# → Saves config to ~/.charli/config.json
+```
+
+Or configure manually:
+
+```bash
+mkdir -p ~/.charli
+cat > ~/.charli/config.json << 'EOF'
+{
+  "serverUrl": "http://charli-server:3000",
+  "apiKey": "chk_your_cli_key_here",
+  "deviceName": "charli-cli"
+}
+EOF
+```
+
+### Usage
+
+```bash
+node bin/charli.js status              # Check config + server connection
+node bin/charli.js ask "Hello!"        # Text chat
+node bin/charli.js ask "What did I just say?"  # Follow-up (uses conversation history)
+```
+
+### Device Type Differences
+
+| Feature | Voice devices | CLI |
+|---------|--------------|-----|
+| Response format | Plain text, no markdown | Markdown with code blocks |
+| Response length | 1-3 sentences (150 tokens) | Detailed (1024 tokens) |
+| Conversation history | 3 turns | 10 turns |
+| System prompt | "Keep answers SHORT" | "Give thorough, detailed answers" |
